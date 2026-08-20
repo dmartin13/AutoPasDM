@@ -255,6 +255,15 @@ class Simulation {
      * Records the time required for the update of the AutoPas container.
      */
     autopas::utils::Timer updateContainer;
+
+    /**
+     * Records the complete DistributedAutoPas synchronization phase.
+     *
+     * This includes the node-local container update, optional load balancing,
+     * particle migration, and halo exchange. It is intentionally aggregated
+     * because these operations are encapsulated by DistributedAutoPas.
+     */
+    autopas::utils::Timer distributedSynchronization;
   };
 
   /**

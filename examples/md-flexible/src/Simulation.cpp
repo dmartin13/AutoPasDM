@@ -277,12 +277,14 @@ void Simulation::run() {
                                    _configuration.deltaT.value != 0 and not _simulationIsPaused and
                                    _iteration % _configuration.loadBalancingInterval.value == 0;
 
+    _timers.distributedSynchronization.start();
     if (shouldLoadBalance) {
       const auto computationalLoad = static_cast<double>(_timers.computationalLoad.stop());
       _distributedAutoPasContainer->prepareInteractions(computationalLoad);
     } else {
       _distributedAutoPasContainer->prepareInteractions();
     }
+    _timers.distributedSynchronization.stop();
 
     _timers.reflectParticlesAtBoundaries.start();
     ReflectiveBoundary::apply(*_distributedAutoPasContainer, *_configuration.getParticlePropertiesLibrary(),
@@ -623,6 +625,7 @@ void Simulation::logMeasurements() {
   const long reflectParticlesAtBoundaries = accumulateTime(_timers.reflectParticlesAtBoundaries.getTotalTime());
   const long migratingParticleExchange = accumulateTime(_timers.migratingParticleExchange.getTotalTime());
   const long loadBalancing = accumulateTime(_timers.loadBalancing.getTotalTime());
+  const long distributedSynchronization = accumulateTime(_timers.distributedSynchronization.getTotalTime());
 #ifdef AUTOPAS_ENABLE_ENERGY_MEASUREMENTS
   const double totalEnergy = _distributedAutoPasContainer->globalSum(_totalEnergySensor.getJoules());
 #endif
@@ -666,6 +669,8 @@ void Simulation::logMeasurements() {
     std::cout << timerToString("    Thermostat                    ", thermostat, maximumNumberOfDigits, simulate);
     std::cout << timerToString("    Vtk                           ", vtk, maximumNumberOfDigits, simulate);
     std::cout << timerToString("    LoadBalancing                 ", loadBalancing, maximumNumberOfDigits, simulate);
+    std::cout << timerToString("    DistributedSynchronization    ", distributedSynchronization, maximumNumberOfDigits,
+                               simulate);
     std::cout << timerToString("  One iteration                 ", simulate / static_cast<long>(_iteration),
                                maximumNumberOfDigits, total);
 
