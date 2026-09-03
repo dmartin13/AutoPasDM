@@ -31,24 +31,56 @@ namespace dap {
  * distributed particle system rather than in terms of MPI or local AutoPas
  * iterators. The simulator describes what should happen to owned particles and
  * DistributedAutoPas decides how the local storage and communication are handled.
+ *
+ * @tparam Particle AutoPas-compatible particle type stored in the distributed container.
+ * @tparam Serializer Serialization policy used to communicate the particle type.
  */
 template <class Particle, class Serializer = ParticleSerializer<Particle>>
 class DistributedAutoPas {
  public:
+  /**
+   * Construct a distributed container with the legacy one-dimensional x decomposition.
+   *
+   * The x dimension is periodic, while y and z are not subdivided and use non-periodic boundaries.
+   *
+   * @param runtime Process runtime used for distributed communication.
+   * @param globalMin Lower corner of the global simulation box.
+   * @param globalMax Upper corner of the global simulation box.
+   * @param cutoff Interaction cutoff used to size the halo region.
+   */
   DistributedAutoPas(Runtime &runtime, const std::array<double, 3> &globalMin, const std::array<double, 3> &globalMax,
                      double cutoff)
       : DistributedAutoPas(
             runtime, globalMin, globalMax, cutoff, std::array<bool, 3>{true, false, false},
             std::array<BoundaryType, 3>{BoundaryType::periodic, BoundaryType::none, BoundaryType::none}) {}
 
-  /** Construct a distributed container with a Cartesian process grid. */
+  /**
+   * Construct a distributed container with an automatically generated Cartesian process grid.
+   *
+   * All global boundaries are periodic.
+   *
+   * @param runtime Process runtime used for distributed communication.
+   * @param globalMin Lower corner of the global simulation box.
+   * @param globalMax Upper corner of the global simulation box.
+   * @param cutoff Interaction cutoff used to size the halo region.
+   * @param subdivideDimensions Selects which Cartesian dimensions may be subdivided.
+   */
   DistributedAutoPas(Runtime &runtime, const std::array<double, 3> &globalMin, const std::array<double, 3> &globalMax,
                      double cutoff, const std::array<bool, 3> &subdivideDimensions)
       : DistributedAutoPas(
             runtime, globalMin, globalMax, cutoff, subdivideDimensions,
             std::array<BoundaryType, 3>{BoundaryType::periodic, BoundaryType::periodic, BoundaryType::periodic}) {}
 
-  /** Construct a distributed container with explicit per-dimension boundary conditions. */
+  /**
+   * Construct a distributed container with an automatically generated Cartesian process grid and explicit boundaries.
+   *
+   * @param runtime Process runtime used for distributed communication.
+   * @param globalMin Lower corner of the global simulation box.
+   * @param globalMax Upper corner of the global simulation box.
+   * @param cutoff Interaction cutoff used to size the halo region.
+   * @param subdivideDimensions Selects which Cartesian dimensions may be subdivided.
+   * @param boundaryTypes Boundary condition applied at the global boundary of each dimension.
+   */
   DistributedAutoPas(Runtime &runtime, const std::array<double, 3> &globalMin, const std::array<double, 3> &globalMax,
                      double cutoff, const std::array<bool, 3> &subdivideDimensions,
                      const std::array<BoundaryType, 3> &boundaryTypes)
@@ -56,7 +88,16 @@ class DistributedAutoPas {
 
   /**
    * Construct and configure the node-local AutoPas instance before initialization.
-   * This overload keeps the legacy x-periodic decomposition for backwards compatibility.
+   *
+   * This overload keeps the legacy x-periodic decomposition for backwards compatibility. The configurator is invoked
+   * after box and cutoff setup and before AutoPas::init().
+   *
+   * @tparam Configurator Callable accepting a reference to the node-local AutoPas instance.
+   * @param runtime Process runtime used for distributed communication.
+   * @param globalMin Lower corner of the global simulation box.
+   * @param globalMax Upper corner of the global simulation box.
+   * @param cutoff Interaction cutoff used to size the halo region.
+   * @param configurator Callback used to configure the node-local AutoPas instance.
    */
   template <class Configurator>
   requires std::invocable < Configurator, autopas::AutoPas<Particle>
@@ -66,7 +107,20 @@ class DistributedAutoPas {
                            std::array<BoundaryType, 3>{BoundaryType::periodic, BoundaryType::none, BoundaryType::none},
                            std::forward<Configurator>(configurator)) {}
 
-  /** Construct and configure a distributed container with a Cartesian process grid. */
+  /**
+   * Construct and configure a distributed container with an automatically generated Cartesian process grid.
+   *
+   * All global boundaries are periodic. The configurator is invoked after box and cutoff setup and before
+   * AutoPas::init().
+   *
+   * @tparam Configurator Callable accepting a reference to the node-local AutoPas instance.
+   * @param runtime Process runtime used for distributed communication.
+   * @param globalMin Lower corner of the global simulation box.
+   * @param globalMax Upper corner of the global simulation box.
+   * @param cutoff Interaction cutoff used to size the halo region.
+   * @param subdivideDimensions Selects which Cartesian dimensions may be subdivided.
+   * @param configurator Callback used to configure the node-local AutoPas instance.
+   */
   template <class Configurator>
   requires std::invocable < Configurator, autopas::AutoPas<Particle>
   & > DistributedAutoPas(Runtime &runtime, const std::array<double, 3> &globalMin,
@@ -84,7 +138,16 @@ class DistributedAutoPas {
    * periodic, reflective, and none are accepted as distributed boundary topology.
    * Reflective boundaries are non-periodic for migration and halo exchange. The
    * physical wall force itself is intentionally application-defined and is not
-   * applied by DistributedAutoPas.
+   * applied by DistributedAutoPas. The configurator is invoked after box and cutoff setup and before AutoPas::init().
+   *
+   * @tparam Configurator Callable accepting a reference to the node-local AutoPas instance.
+   * @param runtime Process runtime used for distributed communication.
+   * @param globalMin Lower corner of the global simulation box.
+   * @param globalMax Upper corner of the global simulation box.
+   * @param cutoff Interaction cutoff used to size the halo region.
+   * @param subdivideDimensions Selects which Cartesian dimensions may be subdivided.
+   * @param boundaryTypes Boundary condition applied at the global boundary of each dimension.
+   * @param configurator Callback used to configure the node-local AutoPas instance.
    */
   template <class Configurator>
   requires std::invocable < Configurator, autopas::AutoPas<Particle>
@@ -104,27 +167,26 @@ class DistributedAutoPas {
     _autoPas.init();
   }
 
+  /**
+   * Add one particle directly to the node-local AutoPas container.
+   *
+   * The particle must already belong to this rank's local ownership box. Use addDistributedParticles() or
+   * addParticlesFromRoot() when ownership is not known by the caller.
+   *
+   * @param particle Particle owned by this rank.
+   */
   void addParticle(const Particle &particle) { _autoPas.addParticle(particle); }
 
   /**
-   * Redistribute application-provided particles according to the current domain decomposition
-   * and add the particles owned by this rank to the local AutoPas container.
-   *
-   * Every rank contributes its local input collection and must call this collective operation.
-   * Particles are sent directly to their owning rank, so the application does not need a particle
-   * communicator or access to the distributed communication context. This operation is intended
-   * for initialization and checkpoint loading, not for timestep migration.
-   *
-   * Particles outside the global simulation box are ignored. The application can detect such
-   * input through its global particle-count sanity check.
-   */
-  /**
    * Add a particle collection that conceptually originates on one root rank.
    *
-   * All ranks must call this collective operation with the same root rank. Only the
-   * collection passed on rootRank is considered. Collections present on the other
-   * ranks are ignored. This is useful for replicated application input such as
-   * deterministic particles generated from a shared configuration file.
+   * All ranks must call this collective operation with the same root rank. Only the collection passed on rootRank is
+   * considered. Collections present on the other ranks are ignored. This is useful for replicated application input
+   * such as deterministic particles generated from a shared configuration file.
+   *
+   * @tparam Collection Particle collection type that supports range-based iteration.
+   * @param particles Particle collection considered on rootRank.
+   * @param rootRank Rank whose particle collection is redistributed.
    */
   template <class Collection>
   void addParticlesFromRoot(const Collection &particles, int rootRank = 0) {
@@ -140,6 +202,18 @@ class DistributedAutoPas {
     }
   }
 
+  /**
+   * Redistribute application-provided particles according to the current domain decomposition and add locally owned
+   * particles to the node-local AutoPas container.
+   *
+   * Every rank contributes its local input collection and must call this collective operation. Particles are sent
+   * directly to their owning rank, so the application does not need a particle communicator or access to the
+   * distributed communication context. This operation is intended for initialization and checkpoint loading, not for
+   * timestep migration. Particles outside the global simulation box are ignored.
+   *
+   * @tparam Collection Particle collection type that supports range-based iteration.
+   * @param particles Particles contributed by this rank.
+   */
   template <class Collection>
   void addDistributedParticles(const Collection &particles) {
     std::vector<std::vector<Particle>> particlesByDestination(static_cast<std::size_t>(_domain.numRanks()));
@@ -172,6 +246,9 @@ class DistributedAutoPas {
    * this is implemented with the node-local AutoPas iterator and OpenMP. Keeping the
    * operation at this level allows a future implementation to dispatch the same
    * operation to a GPU without exposing container iterators to the simulator.
+   *
+   * @tparam Kernel Callable accepting a mutable particle reference.
+   * @param kernel Particle-local operation executed for every owned particle.
    */
   template <class Kernel>
   void applyToOwnedParticles(Kernel &&kernel) {
@@ -189,6 +266,7 @@ class DistributedAutoPas {
    * it is forwarded to AutoPas. This keeps applications independent of the local
    * container while allowing AutoPas to use its optimized region iterator.
    *
+   * @tparam Kernel Callable accepting a mutable particle reference.
    * @param regionMin Lower corner of the requested region.
    * @param regionMax Upper corner of the requested region.
    * @param kernel Particle-local operation.
@@ -227,6 +305,11 @@ class DistributedAutoPas {
    * separate via globalSum(), so callers can combine several local quantities
    * before triggering communication. The operation hides the node-local AutoPas
    * iterator and can later be implemented by a device reduction.
+   *
+   * @tparam Value Arithmetic reduction type.
+   * @tparam Transform Callable mapping a particle to one contribution of type Value.
+   * @param initialValue Initial value of the local sum.
+   * @param transform Particle-local transformation whose results are added to the sum.
    */
   template <class Value, class Transform>
   [[nodiscard]] Value sumOwnedParticles(Value initialValue, Transform &&transform) const {
@@ -242,6 +325,9 @@ class DistributedAutoPas {
   /**
    * Read-only traversal intended for diagnostics and output. Unlike
    * applyToOwnedParticles(), this is deliberately sequential to preserve output order.
+   *
+   * @tparam Visitor Callable accepting a const particle reference.
+   * @param visitor Operation executed sequentially for every owned particle.
    */
   template <class Visitor>
   void forEachOwnedParticle(Visitor &&visitor) const {
@@ -294,7 +380,11 @@ class DistributedAutoPas {
    * No migration or halo exchange is triggered here. This is useful when several
    * interaction functors operate on the same prepared distributed state or when
    * application-level physics, such as a reflective wall force, must be applied
-   * after communication and before the ordinary particle interactions.
+   * after communication and before the ordinary particle interactions. The boolean result has the same semantics as
+   * AutoPas::computeInteractions() and indicates whether the call was a tuning iteration.
+   *
+   * @tparam Functor AutoPas interaction functor type.
+   * @param functor Interaction functor executed on the prepared node-local AutoPas state.
    */
   template <class Functor>
   bool computeInteractionsPrepared(Functor *functor) {
@@ -306,7 +396,11 @@ class DistributedAutoPas {
    *
    * This convenience operation keeps the original single-call API. Applications that
    * need an explicit preparation phase should use prepareInteractions() followed by
-   * computeInteractionsPrepared().
+   * computeInteractionsPrepared(). The boolean result has the same semantics as AutoPas::computeInteractions() and
+   * indicates whether the interaction call was a tuning iteration.
+   *
+   * @tparam Functor AutoPas interaction functor type.
+   * @param functor Interaction functor executed after distributed synchronization.
    */
   template <class Functor>
   bool computeInteractions(Functor *functor) {
@@ -314,45 +408,77 @@ class DistributedAutoPas {
     return computeInteractionsPrepared(functor);
   }
 
+  /** Get the number of particles owned by this rank. */
   [[nodiscard]] std::size_t getLocalNumberOfOwnedParticles() const {
     return _autoPas.getNumberOfParticles(autopas::IteratorBehavior::owned);
   }
 
+  /** Get the number of halo particles stored by this rank. */
   [[nodiscard]] std::size_t getLocalNumberOfHaloParticles() const {
     return _autoPas.getNumberOfParticles(autopas::IteratorBehavior::halo);
   }
 
+  /** Get the number of owned and halo particles stored by this rank. */
   [[nodiscard]] std::size_t getLocalNumberOfParticles() const {
     return _autoPas.getNumberOfParticles(autopas::IteratorBehavior::ownedOrHalo);
   }
 
+  /** Get the global number of owned particles summed over all ranks. */
   [[nodiscard]] std::size_t getGlobalNumberOfOwnedParticles() const {
     return globalSum(getLocalNumberOfOwnedParticles());
   }
 
+  /** Get the rank in the DistributedAutoPas runtime. */
   [[nodiscard]] int rank() const { return _runtime.rank(); }
+
+  /** Get the total number of ranks in the DistributedAutoPas runtime. */
   [[nodiscard]] int numberOfRanks() const { return _runtime.size(); }
+
+  /** Check whether this process is rank zero. */
   [[nodiscard]] bool isRoot() const { return _runtime.isRoot(); }
 
+  /** Synchronize all ranks in the DistributedAutoPas runtime. */
   void barrier() const { _runtime.barrier(); }
 
+  /**
+   * Sum one scalar value over all ranks.
+   *
+   * @tparam T Supported arithmetic type.
+   * @param localValue Value contributed by this rank.
+   */
   template <class T>
   [[nodiscard]] T globalSum(T localValue) const {
     return _runtime.globalSum(localValue);
   }
 
+  /** Get the lower corner of this rank's local ownership box. */
   [[nodiscard]] const std::array<double, 3> &localBoxMin() const { return _domain.localMin(); }
+
+  /** Get the upper corner of this rank's local ownership box. */
   [[nodiscard]] const std::array<double, 3> &localBoxMax() const { return _domain.localMax(); }
+
+  /** Get the lower corner of the global simulation box. */
   [[nodiscard]] const std::array<double, 3> &globalBoxMin() const { return _domain.globalMin(); }
+
+  /** Get the upper corner of the global simulation box. */
   [[nodiscard]] const std::array<double, 3> &globalBoxMax() const { return _domain.globalMax(); }
+
+  /** Get the boundary conditions of the global simulation box. */
   [[nodiscard]] const std::array<BoundaryType, 3> &boundaryTypes() const { return _domain.boundaryTypes(); }
 
-  // Maybe this can be removed/restructured later
   // Local AutoPas metadata that is still used by md-flexible for tuning statistics.
   // These methods deliberately expose values, not the local container itself.
+
+  /** Check whether the node-local AutoPas tuning search space contains at most one configuration. */
   [[nodiscard]] bool localSearchSpaceIsTrivial() const { return _autoPas.searchSpaceIsTrivial(); }
+
+  /** Get the mean rebuild frequency observed by the node-local AutoPas instance. */
   [[nodiscard]] double getMeanLocalRebuildFrequency() { return _autoPas.getMeanRebuildFrequency(); }
+
+  /** Get the Verlet skin configured for the node-local AutoPas instance. */
   [[nodiscard]] auto getVerletSkin() { return _autoPas.getVerletSkin(); }
+
+  /** Get the Verlet rebuild frequency configured for the node-local AutoPas instance. */
   [[nodiscard]] auto getVerletRebuildFrequency() { return _autoPas.getVerletRebuildFrequency(); }
 
   /**
@@ -362,19 +488,34 @@ class DistributedAutoPas {
    */
   [[nodiscard]] auto getCurrentLocalConfigurations() const { return _autoPas.getCurrentConfigs(); }
 
+  /** Finalize the node-local AutoPas instance before the communication runtime is destroyed. */
   void finalize() { _autoPas.finalize(); }
 
  private:
+  /**
+   * Update the node-local container, migrate emigrants, and rebuild halo particles without changing the domain bounds.
+   */
   void synchronizeParticles() {
     auto emigrants = _autoPas.updateContainer();
     migrateAndExchangeHalos(std::move(emigrants));
   }
 
+  /**
+   * Synchronize particles while applying externally proposed local ownership bounds.
+   *
+   * @param localMin Proposed lower corner of this rank's ownership box.
+   * @param localMax Proposed upper corner of this rank's ownership box.
+   */
   void synchronizeParticles(const std::array<double, 3> &localMin, const std::array<double, 3> &localMax) {
     auto emigrants = _autoPas.updateContainer();
     resizeDomainAndMigrate(std::move(emigrants), localMin, localMax);
   }
 
+  /**
+   * Synchronize particles and update the local domain through inverted-pressure load balancing.
+   *
+   * @param localWork Computational work measured on this rank.
+   */
   void synchronizeParticlesWithLoadBalancing(double localWork) {
     auto emigrants = _autoPas.updateContainer();
 
@@ -394,6 +535,13 @@ class DistributedAutoPas {
     resizeDomainAndMigrate(std::move(emigrants), balancedBox.min, balancedBox.max);
   }
 
+  /**
+   * Resize the complete adaptive decomposition and migrate all particles invalidated by the geometry change.
+   *
+   * @param emigrants Particles already removed by AutoPas::updateContainer() for the previous ownership box.
+   * @param localMin Proposed lower corner of this rank's new ownership box.
+   * @param localMax Proposed upper corner of this rank's new ownership box.
+   */
   void resizeDomainAndMigrate(std::vector<Particle> emigrants, const std::array<double, 3> &localMin,
                               const std::array<double, 3> &localMax) {
     // Synchronize the complete Cartesian split positions before changing AutoPas.
@@ -410,6 +558,14 @@ class DistributedAutoPas {
     migrateAndExchangeHalos(std::move(emigrants));
   }
 
+  /**
+   * Collect local ownership bounds from all ranks and reconstruct the global split positions in every dimension.
+   *
+   * Shared boundaries proposed by adjacent ranks must agree exactly.
+   *
+   * @param localMin Proposed lower corner of this rank's ownership box.
+   * @param localMax Proposed upper corner of this rank's ownership box.
+   */
   [[nodiscard]] std::array<std::vector<double>, 3> collectSubdomainBoundaries(
       const std::array<double, 3> &localMin, const std::array<double, 3> &localMax) const {
     const std::array<double, 6> localBounds{localMin[0], localMin[1], localMin[2],
@@ -453,6 +609,11 @@ class DistributedAutoPas {
     return boundaries;
   }
 
+  /**
+   * Complete particle migration and rebuild halo particles for the current domain decomposition.
+   *
+   * @param emigrants Particles that no longer belong to the local ownership box.
+   */
   void migrateAndExchangeHalos(std::vector<Particle> emigrants) {
     auto immigrants = _particleMigration.migrate(emigrants, _domain);
     _autoPas.addParticles(immigrants);

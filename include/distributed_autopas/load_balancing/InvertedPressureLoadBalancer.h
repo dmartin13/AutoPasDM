@@ -11,9 +11,14 @@
 
 namespace dap::load_balancing {
 
-/** Local ownership bounds proposed by a load balancer. */
+/**
+ * Local ownership bounds proposed by a load balancer.
+ */
 struct LocalBox {
+  /** Lower corner of the proposed local ownership box. */
   std::array<double, 3> min{};
+
+  /** Upper corner of the proposed local ownership box. */
   std::array<double, 3> max{};
 };
 
@@ -34,6 +39,12 @@ struct LocalBox {
  */
 class InvertedPressureLoadBalancer {
  public:
+  /**
+   * Construct the load balancer and create one communicator for each process-grid plane.
+   *
+   * @param communicator MPI communicator containing all ranks of the domain decomposition.
+   * @param domain Domain decomposition whose fixed process topology is balanced by this object.
+   */
   InvertedPressureLoadBalancer(MPI_Comm communicator, const DomainDecomposition &domain)
       : _communicator(communicator), _processGrid(domain.processGrid()), _coordinates(domain.coordinates()) {
     for (std::size_t dimension = 0; dimension < 3; ++dimension) {
@@ -54,6 +65,9 @@ class InvertedPressureLoadBalancer {
   InvertedPressureLoadBalancer(InvertedPressureLoadBalancer &&) = delete;
   InvertedPressureLoadBalancer &operator=(InvertedPressureLoadBalancer &&) = delete;
 
+  /**
+   * Free the process-plane communicators unless MPI has already been finalized.
+   */
   ~InvertedPressureLoadBalancer() {
     int finalized = 0;
     MPI_Finalized(&finalized);
@@ -71,10 +85,11 @@ class InvertedPressureLoadBalancer {
   /**
    * Calculate updated local ownership bounds from one local work measurement.
    *
+   * The input domain is not modified.
+   *
    * @param localWork Work measured on this MPI rank.
    * @param domain Current domain decomposition.
    * @param minWidth Minimum allowed subdomain width in every balanced dimension.
-   * @return Proposed local ownership box. The input domain is not modified.
    */
   [[nodiscard]] LocalBox balance(double localWork, const DomainDecomposition &domain, double minWidth) const {
     if (localWork < 0.) {

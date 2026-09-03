@@ -15,6 +15,11 @@ namespace detail {
 template <class>
 inline constexpr bool alwaysFalse = false;
 
+/**
+ * Map a supported C++ reduction type to the corresponding MPI datatype.
+ *
+ * @tparam T C++ type used in the collective operation.
+ */
 template <class T>
 MPI_Datatype mpiDatatype() {
   if constexpr (std::is_same_v<T, double>) {
@@ -58,6 +63,15 @@ MPI_Datatype mpiDatatype() {
  */
 class Runtime {
  public:
+  /**
+   * Initialize the process runtime and create a private communication context.
+   *
+   * MPI is initialized only if the application has not initialized it already. In that case Runtime also finalizes MPI
+   * when it is destroyed.
+   *
+   * @param argc Application argument count forwarded to MPI_Init when necessary.
+   * @param argv Application argument vector forwarded to MPI_Init when necessary.
+   */
   Runtime(int &argc, char **&argv);
 
   Runtime(const Runtime &) = delete;
@@ -65,10 +79,18 @@ class Runtime {
   Runtime(Runtime &&) = delete;
   Runtime &operator=(Runtime &&) = delete;
 
+  /**
+   * Release the private communication context and finalize MPI if this Runtime initialized it.
+   */
   ~Runtime();
 
+  /** Get the rank in the private DistributedAutoPas communication context. */
   [[nodiscard]] int rank() const;
+
+  /** Get the number of ranks in the private DistributedAutoPas communication context. */
   [[nodiscard]] int size() const;
+
+  /** Check whether this process is rank zero. */
   [[nodiscard]] bool isRoot() const;
 
   /**
@@ -76,6 +98,9 @@ class Runtime {
    *
    * This keeps backend-specific communication out of application utilities such
    * as the VTK writer.
+   *
+   * @param value String sent by the root rank and overwritten with the received value on all other ranks.
+   * @param rootRank Rank that provides the string.
    */
   void broadcastString(std::string &value, int rootRank = 0) const;
 
@@ -83,10 +108,18 @@ class Runtime {
   template <class Particle, class Serializer>
   friend class DistributedAutoPas;
 
+  /** Get the private MPI communicator used internally by DistributedAutoPas. */
   [[nodiscard]] MPI_Comm communicator() const;
 
+  /** Synchronize all ranks in the private DistributedAutoPas communication context. */
   void barrier() const;
 
+  /**
+   * Sum one scalar value over all ranks in the private communication context.
+   *
+   * @tparam T Supported arithmetic type.
+   * @param localValue Value contributed by this rank.
+   */
   template <class T>
   [[nodiscard]] T globalSum(T localValue) const {
     T globalValue{};

@@ -18,7 +18,6 @@ namespace dap::load_balancing {
  * @param leftMin Minimum boundary of the left domain in the selected dimension.
  * @param rightMax Maximum boundary of the right domain in the selected dimension.
  * @param minWidth Minimum allowed width of either adjacent domain.
- * @return Balanced position of the shared boundary.
  */
 inline double balanceAdjacentDomains(double leftWork, double rightWork, double leftMin, double rightMax,
                                      double minWidth) {

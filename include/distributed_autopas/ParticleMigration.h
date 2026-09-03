@@ -26,12 +26,26 @@ namespace dap {
  * BoundaryType::reflective is non-periodic and expects the application-level
  * reflective force to keep particles inside the global box. Crossing a reflective
  * boundary is treated as an error instead of silently deleting or wrapping the particle.
+ *
+ * @tparam Particle Particle type migrated between ranks.
+ * @tparam Serializer Serialization policy used for the particle type.
  */
 template <class Particle, class Serializer = ParticleSerializer<Particle>>
 class ParticleMigration {
  public:
+  /**
+   * Construct a particle migrator for one communication context.
+   *
+   * @param comm MPI communicator used for migration.
+   */
   explicit ParticleMigration(MPI_Comm comm) : _comm(comm) {}
 
+  /**
+   * Migrate emigrants to their owning rank using staged direct-neighbor communication.
+   *
+   * @param emigrants Particles that left the previous local AutoPas ownership box.
+   * @param domain Current Cartesian domain decomposition used to route the particles.
+   */
   [[nodiscard]] std::vector<Particle> migrate(const std::vector<Particle> &emigrants,
                                               const DomainDecomposition &domain) const {
     auto remainingParticles = emigrants;

@@ -17,6 +17,7 @@ namespace dap {
  */
 template <>
 struct ParticleSerializer<mdLib::MoleculeLJ> {
+  /** Serialized state required to reconstruct a MoleculeLJ on another rank. */
   struct Message {
     std::array<double, 3> r{};
     std::array<double, 3> v{};
@@ -26,11 +27,21 @@ struct ParticleSerializer<mdLib::MoleculeLJ> {
     std::size_t typeId{0};
   };
 
+  /**
+   * Serialize one MoleculeLJ particle for distributed communication.
+   *
+   * @param particle Particle to serialize.
+   */
   static Message pack(const mdLib::MoleculeLJ &particle) {
     return Message{particle.getR(),    particle.getV(),  particle.getF(),
                    particle.getOldF(), particle.getID(), particle.getTypeId()};
   }
 
+  /**
+   * Reconstruct one MoleculeLJ particle from its serialized state.
+   *
+   * @param message Serialized particle state.
+   */
   static mdLib::MoleculeLJ unpack(const Message &message) {
     mdLib::MoleculeLJ particle;
     particle.setR(message.r);

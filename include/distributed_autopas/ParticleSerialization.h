@@ -11,8 +11,10 @@ namespace dap {
  *   static Message pack(const Particle &particle);
  *   static Particle unpack(const Message &message);
  *
- * Message must be trivially copyable because the current MVP communication layer transfers
+ * Message must be trivially copyable because the current communication layer transfers
  * messages as MPI_BYTE.
+ *
+ * @tparam Particle AutoPas-compatible particle type to serialize.
  */
 template <class Particle>
 struct ParticleSerializer;

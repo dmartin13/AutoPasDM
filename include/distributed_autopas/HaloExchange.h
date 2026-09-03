@@ -24,12 +24,27 @@ namespace dap {
  * and BoundaryType::reflective are non-periodic communication boundaries and
  * therefore create no halo across the global box boundary. Reflective wall
  * forces are intentionally handled outside the distributed communication layer.
+ *
+ * @tparam Particle Particle type exchanged between ranks.
+ * @tparam Serializer Serialization policy used for the particle type.
  */
 template <class Particle, class Serializer = ParticleSerializer<Particle>>
 class HaloExchange {
  public:
+  /**
+   * Construct a halo exchanger for one communication context.
+   *
+   * @param comm MPI communicator used for halo communication.
+   */
   explicit HaloExchange(MPI_Comm comm) : _comm(comm) {}
 
+  /**
+   * Build all halo particles required by this rank for the current ownership geometry.
+   *
+   * @param ownedParticles Particles currently owned by this rank.
+   * @param domain Current Cartesian domain decomposition.
+   * @param haloWidth Width of the halo region.
+   */
   [[nodiscard]] std::vector<Particle> exchange(const std::vector<Particle> &ownedParticles,
                                                const DomainDecomposition &domain, double haloWidth) const {
     std::vector<Particle> candidates = ownedParticles;
@@ -83,6 +98,14 @@ class HaloExchange {
   }
 
  private:
+  /**
+   * Shift received particles to the periodic image adjacent to the local domain if an exchange crossed the global box.
+   *
+   * @param particles Received particles to shift in place.
+   * @param domain Current Cartesian domain decomposition.
+   * @param dimension Cartesian dimension of the current halo stage.
+   * @param receivedFromPreceding Whether the particles were received from the preceding neighbor.
+   */
   static void shiftPeriodicImages(std::vector<Particle> &particles, const DomainDecomposition &domain,
                                   std::size_t dimension, bool receivedFromPreceding) {
     if (domain.boundaryType(static_cast<int>(dimension)) != BoundaryType::periodic) {

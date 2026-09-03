@@ -13,6 +13,11 @@
 
 namespace dap {
 
+/**
+ * Particles received from the two direct neighbors of one Cartesian dimension.
+ *
+ * @tparam Particle Particle type exchanged between ranks.
+ */
 template <class Particle>
 struct LeftRightExchange {
   std::vector<Particle> recvFromLeft;
@@ -21,6 +26,13 @@ struct LeftRightExchange {
 
 namespace detail {
 
+/**
+ * Serialize a particle vector into the transport representation provided by the serializer.
+ *
+ * @tparam Particle Particle type to serialize.
+ * @tparam Serializer Serialization policy used for the particle type.
+ * @param particles Particles to serialize.
+ */
 template <class Particle, class Serializer>
 std::vector<typename Serializer::Message> packParticles(const std::vector<Particle> &particles) {
   std::vector<typename Serializer::Message> messages;
@@ -31,6 +43,13 @@ std::vector<typename Serializer::Message> packParticles(const std::vector<Partic
   return messages;
 }
 
+/**
+ * Deserialize transport messages into particles.
+ *
+ * @tparam Particle Particle type to reconstruct.
+ * @tparam Serializer Serialization policy used for the particle type.
+ * @param messages Serialized particle messages.
+ */
 template <class Particle, class Serializer>
 std::vector<Particle> unpackParticles(const std::vector<typename Serializer::Message> &messages) {
   std::vector<Particle> particles;
@@ -41,6 +60,11 @@ std::vector<Particle> unpackParticles(const std::vector<typename Serializer::Mes
   return particles;
 }
 
+/**
+ * Translate the backend-independent missing-neighbor sentinel to the MPI representation.
+ *
+ * @param rank Neighbor rank or a negative value if no neighbor exists.
+ */
 inline int toMpiNeighbor(int rank) { return rank < 0 ? MPI_PROC_NULL : rank; }
 
 }  // namespace detail
@@ -56,6 +80,9 @@ inline int toMpiNeighbor(int rank) { return rank < 0 ? MPI_PROC_NULL : rank; }
  * finishLeftRightExchange(). The destructor waits for outstanding operations as
  * a safety net so that communication buffers are never destroyed while MPI may
  * still access them.
+ *
+ * @tparam Particle Particle type exchanged between ranks.
+ * @tparam Serializer Serialization policy used for the particle type.
  */
 template <class Particle, class Serializer = ParticleSerializer<Particle>>
 class LeftRightExchangeRequest {
@@ -66,6 +93,11 @@ class LeftRightExchangeRequest {
   LeftRightExchangeRequest &operator=(const LeftRightExchangeRequest &) = delete;
   LeftRightExchangeRequest &operator=(LeftRightExchangeRequest &&) = delete;
 
+  /**
+   * Move an in-flight exchange together with all communication buffers and MPI requests.
+   *
+   * @param other Request whose ownership is transferred.
+   */
   LeftRightExchangeRequest(LeftRightExchangeRequest &&other) noexcept
       : _sendLeftMessages(std::move(other._sendLeftMessages)),
         _sendRightMessages(std::move(other._sendRightMessages)),
@@ -77,11 +109,26 @@ class LeftRightExchangeRequest {
     other._active = false;
   }
 
+  /**
+   * Complete outstanding communication before destroying the owned buffers.
+   */
   ~LeftRightExchangeRequest() { waitForCompletion(); }
 
+  /**
+   * Check whether payload communication is still in flight.
+   */
   [[nodiscard]] bool active() const noexcept { return _active; }
 
  private:
+  /**
+   * Construct a request from serialized buffers and already posted MPI requests.
+   *
+   * @param sendLeftMessages Serialized particles sent to the preceding neighbor.
+   * @param sendRightMessages Serialized particles sent to the succeeding neighbor.
+   * @param recvFromLeftMessages Receive buffer for particles from the preceding neighbor.
+   * @param recvFromRightMessages Receive buffer for particles from the succeeding neighbor.
+   * @param requests Payload MPI requests owned by this request object.
+   */
   LeftRightExchangeRequest(std::vector<Message> sendLeftMessages, std::vector<Message> sendRightMessages,
                            std::vector<Message> recvFromLeftMessages, std::vector<Message> recvFromRightMessages,
                            std::array<MPI_Request, 4> requests)
@@ -92,6 +139,9 @@ class LeftRightExchangeRequest {
         _requests(requests),
         _active(true) {}
 
+  /**
+   * Wait for all outstanding payload requests exactly once.
+   */
   void waitForCompletion() {
     if (not _active) {
       return;
@@ -128,6 +178,15 @@ class LeftRightExchangeRequest {
  * Serialization is delegated to ParticleSerializer<Particle>. This keeps the
  * distributed layer independent of the concrete particle representation used by
  * an application.
+ *
+ * @tparam Particle Particle type exchanged between ranks.
+ * @tparam Serializer Serialization policy used for the particle type.
+ * @param comm MPI communicator used for the exchange.
+ * @param left Rank of the preceding neighbor or a negative value if no neighbor exists.
+ * @param right Rank of the succeeding neighbor or a negative value if no neighbor exists.
+ * @param sendLeft Particles to send to the preceding neighbor.
+ * @param sendRight Particles to send to the succeeding neighbor.
+ * @param tag Base MPI tag. The exchange uses this tag and the next three consecutive tags.
  */
 template <class Particle, class Serializer = ParticleSerializer<Particle>>
 LeftRightExchangeRequest<Particle, Serializer> beginLeftRightExchange(MPI_Comm comm, int left, int right,
@@ -183,6 +242,10 @@ LeftRightExchangeRequest<Particle, Serializer> beginLeftRightExchange(MPI_Comm c
 /**
  * Complete an exchange started with beginLeftRightExchange() and deserialize the
  * received particles.
+ *
+ * @tparam Particle Particle type exchanged between ranks.
+ * @tparam Serializer Serialization policy used for the particle type.
+ * @param request In-flight request to complete.
  */
 template <class Particle, class Serializer = ParticleSerializer<Particle>>
 LeftRightExchange<Particle> finishLeftRightExchange(LeftRightExchangeRequest<Particle, Serializer> &request) {
@@ -203,6 +266,15 @@ LeftRightExchange<Particle> finishLeftRightExchange(LeftRightExchangeRequest<Par
  * reference path. Timestep migration and halo exchange use the split-phase
  * non-blocking transport, while this function remains available for correctness
  * and later performance comparisons.
+ *
+ * @tparam Particle Particle type exchanged between ranks.
+ * @tparam Serializer Serialization policy used for the particle type.
+ * @param comm MPI communicator used for the exchange.
+ * @param left Rank of the preceding neighbor or a negative value if no neighbor exists.
+ * @param right Rank of the succeeding neighbor or a negative value if no neighbor exists.
+ * @param sendLeft Particles to send to the preceding neighbor.
+ * @param sendRight Particles to send to the succeeding neighbor.
+ * @param tag Base MPI tag. The exchange uses this tag and the next three consecutive tags.
  */
 template <class Particle, class Serializer = ParticleSerializer<Particle>>
 LeftRightExchange<Particle> exchangeLeftRight(MPI_Comm comm, int left, int right, const std::vector<Particle> &sendLeft,
@@ -254,6 +326,11 @@ LeftRightExchange<Particle> exchangeLeftRight(MPI_Comm comm, int left, int right
  * This collective is primarily used for initialization and checkpoint redistribution where a
  * particle may need to move directly to any rank. Timestep migration intentionally uses the
  * cheaper direct-neighbor exchange instead.
+ *
+ * @tparam Particle Particle type exchanged between ranks.
+ * @tparam Serializer Serialization policy used for the particle type.
+ * @param comm MPI communicator used for the collective redistribution.
+ * @param particlesByDestination One particle buffer per destination rank.
  */
 template <class Particle, class Serializer = ParticleSerializer<Particle>>
 std::vector<Particle> exchangeParticlesByRank(MPI_Comm comm,
