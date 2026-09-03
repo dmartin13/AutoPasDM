@@ -1,0 +1,47 @@
+# Larger static strong-scaling case shared by original md-flexible and DistributedAutoPas.
+#
+# This keeps the same density and fixed AutoPas configuration as
+# dap_performance_baseline.yaml, but increases the global system from 16^3 = 4096
+# to 32^3 = 32768 particles. Load balancing remains disabled so the benchmark
+# isolates the distributed synchronization path.
+
+container: [LinkedCells]
+traversal: [lc_c08]
+data-layout: [SoA]
+newton3: [enabled]
+functor: lennard-jones
+
+cutoff: 2.5
+cell-size: [1.0]
+verlet-skin-radius: 0.0
+tuning-strategies: []
+tuning-phases: 0
+
+box-min: [0.0, 0.0, 0.0]
+box-max: [32.0, 32.0, 32.0]
+
+deltaT: 1.0e-6
+iterations: 100
+
+boundary-type: [periodic, periodic, periodic]
+subdivide-dimension: [true, true, true]
+load-balancer: None
+load-balancing-interval: 10
+
+no-progress-bar: true
+no-end-config: true
+
+Sites:
+  0:
+    epsilon: 1.0
+    sigma: 1.0
+    mass: 1.0
+
+Objects:
+  CubeGrid:
+    0:
+      particles-per-dimension: [32, 32, 32]
+      particle-spacing: 1.0
+      bottomLeftCorner: [0.5, 0.5, 0.5]
+      velocity: [0.0, 0.0, 0.0]
+      particle-type-id: 0

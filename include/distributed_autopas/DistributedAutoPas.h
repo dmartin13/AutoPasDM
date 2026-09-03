@@ -153,6 +153,7 @@ class DistributedAutoPas {
                                       position[1] >= globalMin[1] and position[1] < globalMax[1] and
                                       position[2] >= globalMin[2] and position[2] < globalMax[2];
       if (not insideGlobalDomain) {
+        // TODO: add a warning here
         continue;
       }
 
@@ -346,6 +347,7 @@ class DistributedAutoPas {
   [[nodiscard]] const std::array<double, 3> &globalBoxMax() const { return _domain.globalMax(); }
   [[nodiscard]] const std::array<BoundaryType, 3> &boundaryTypes() const { return _domain.boundaryTypes(); }
 
+  // Maybe this can be removed/restructured later
   // Local AutoPas metadata that is still used by md-flexible for tuning statistics.
   // These methods deliberately expose values, not the local container itself.
   [[nodiscard]] bool localSearchSpaceIsTrivial() const { return _autoPas.searchSpaceIsTrivial(); }
