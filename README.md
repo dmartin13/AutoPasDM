@@ -1,11 +1,22 @@
 # DistributedAutoPas
 
 DistributedAutoPas is a distributed particle-container layer around AutoPas.
-It keeps domain ownership, migration, halo exchange, and communication out of
-the simulator while reusing AutoPas for node-local particle storage and
-interaction traversal.
+It keeps distributed ownership, migration, halo exchange, adaptive load balancing,
+and communication out of the simulator while reusing AutoPas for node-level particle
+storage, interaction traversal, and auto-tuning.
 
-The current static regular-grid implementation supports Cartesian decompositions in x, y, and z. Boundary conditions are selected per dimension. `periodic`, `reflective`, and `none` are represented in the distributed topology. Reflective boundaries are non-periodic for migration and halo exchange. The bundled single-site md-flexible example implements the physical reflective boundary as an application-level Lennard-Jones mirror-wall force and restricts that work to wall-adjacent particle regions through the DistributedAutoPas operation API.
+The current implementation uses a Cartesian process grid in x, y, and z. It starts
+from a regular decomposition and can adapt the subdomain boundaries at runtime with
+inverted-pressure load balancing while keeping the process-grid topology fixed.
+Boundary conditions are selected per dimension. `periodic`, `reflective`, and `none`
+are represented in the distributed topology. Reflective boundaries are non-periodic
+for migration and halo exchange; the bundled single-site md-flexible example keeps
+the physical Lennard-Jones mirror-wall force as application-level physics.
+
+The simulator-facing API deliberately exposes operations on the distributed particle
+system instead of the node-level AutoPas container. Existing AutoPas particle types
+and interaction functors can therefore be reused while DistributedAutoPas owns the
+distributed execution mechanisms.
 
 ## Repository layout
 
@@ -14,8 +25,9 @@ DistributedAutoPas/
 ├── include/distributed_autopas/   # public headers and template code
 ├── src/                           # compiled non-template implementation
 ├── examples/
-│   ├── minimal_mpi.cpp            # small integration example
-│   └── md-flexible/               # md-flexible example application
+│   ├── minimal_mpi.cpp            # low-level runtime / integration example
+│   ├── lj/                        # minimal LJ simulator using DistributedAutoPas
+│   └── md-flexible/               # md-flexible integration and regression inputs
 ├── docs/
 └── tests/
 ```
@@ -41,29 +53,67 @@ cmake -S . -B build \
 cmake --build build -j
 ```
 
-The md-flexible executable is then available at:
+The adapted md-flexible executable is then available at:
 
 ```text
 build/examples/md-flexible/md-flexible
 ```
 
-and the smaller LJ integration example at:
+The minimal LJ example is available at:
+
+```text
+build/examples/lj/lj
+```
+
+and a small md-flexible-particle integration example at:
 
 ```text
 build/examples/md-flexible/distributed-lj-example
 ```
 
+## Current feature set
+
+- Cartesian domain decomposition in one, two, or three dimensions.
+- Per-dimension `periodic`, `reflective`, and `none` boundary topology.
+- Root-owned and already-distributed initial particle insertion.
+- Staged x -> y -> z particle migration through direct face neighbors.
+- Staged x -> y -> z halo exchange with propagation to edge and corner neighbors.
+- Split-phase non-blocking MPI payload transport for timestep migration and halo exchange.
+- Adaptive regular-grid decomposition with inverted-pressure load balancing.
+- Adaptive ownership lookup using the complete process-plane split positions.
+- A compact operation-based public API for particle updates, reductions, diagnostics,
+  distributed synchronization, and AutoPas interaction functors.
+- Integration with the bundled single-site md-flexible example, including the
+  `None` and `InvertedPressure` load-balancer settings and `load-balancing-interval`.
+
+The current implementation deliberately keeps several research directions open.
+Communication/computation overlap is not used yet, MPI is the only communication
+backend, and md-flexible's optional ALL/TENSOR load balancer is not supported.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details and design constraints.
+
 ## Tests
 
-DistributedAutoPas tests use GoogleTest and are enabled by default for a standalone checkout.
-The communication, particle-migration, halo-exchange, and public DistributedAutoPas API tests are MPI GoogleTests. CTest launches the distributed tests with the required rank count, including the split-phase non-blocking neighbor-communication API, migration and halo exchange through that non-blocking transport, one- and four-rank public-API force checks, a region-operation check, an eight-rank 3D ownership check, and eight-rank 3D migration and halo-exchange checks.
+DistributedAutoPas tests use GoogleTest and are enabled by default for a standalone
+checkout. CTest launches MPI tests with their required rank counts. The suite covers,
+among other things:
+
+- Cartesian and adaptive domain geometry,
+- initial particle redistribution,
+- staged migration and halo exchange in 3D,
+- periodic, reflective, and open (`none`) topology,
+- split-phase non-blocking neighbor communication,
+- the public DistributedAutoPas interaction and operation API,
+- inverted-pressure boundary movement and minimum-width enforcement,
+- repeated adaptive load-balancing steps,
+- adaptive `targetRank()` ownership, and
+- an eight-rank 3D end-to-end load-balancing, migration, halo, and force check.
+
 All tests can be run with:
 
 ```bash
 cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
-
 
 ### md-flexible 3D force regression
 
@@ -95,6 +145,24 @@ python3 scripts/compare_vtk_forces.py \
 The comparison should report the same owned-particle IDs and forces within the
 configured tolerance.
 
+### md-flexible load-balancing regression
+
+`examples/md-flexible/input/dap_load_balancing_compare.yaml` and
+`scripts/run_load_balancing_regression.py` compare the bundled DistributedAutoPas
+integration against an MPI-enabled original md-flexible build. Both decompositions
+must adapt and the final global particle state is compared independently of the exact
+owner rank, because runtime-based work measurements can produce different adaptive
+split positions.
+
+For example:
+
+```bash
+python3 scripts/run_load_balancing_regression.py \
+  --reference /path/to/AutoPas/build/examples/md-flexible/md-flexible \
+  --distributed ./md-flexible \
+  --config input/dap_load_balancing_compare.yaml \
+  --ranks 8
+```
 
 ### md-flexible reflective-boundary regression
 
@@ -129,8 +197,7 @@ python3 scripts/check_reflective_forces.py reflective_compare/np8
 The first script checks decomposition independence. The second checks the forces
 against the analytical values of the reflective regression setup.
 
-
 The test build can be disabled with `-DDISTRIBUTED_AUTOPAS_BUILD_TESTS=OFF`.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the current architecture
-and transition plan.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the current architecture,
+design constraints, and remaining limitations.
