@@ -192,6 +192,36 @@ TEST(HaloExchangeTest, ShiftsPeriodicCornerHaloAcrossAllDimensions) {
   }
 }
 
+
+TEST(HaloExchangeTest, CreatesPeriodicHalosLocallyForUndecomposedDimension) {
+  int rank = 0;
+  int numberOfRanks = 0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &numberOfRanks);
+  ASSERT_EQ(numberOfRanks, 4);
+
+  const std::array<double, 3> min{0., 0., 0.};
+  const std::array<double, 3> max{4., 1., 1.};
+  const dap::DomainDecomposition domain(rank, numberOfRanks, min, max, std::array<int, 3>{4, 1, 1});
+  const dap::HaloExchange<Particle> haloExchange(MPI_COMM_WORLD);
+
+  Particle lowerParticle;
+  lowerParticle.setID(static_cast<unsigned long>(9000 + rank * 10));
+  lowerParticle.setR({domain.localMin()[0] + 0.5, 0.1, 0.5});
+
+  Particle upperParticle;
+  upperParticle.setID(static_cast<unsigned long>(9001 + rank * 10));
+  upperParticle.setR({domain.localMin()[0] + 0.5, 0.9, 0.5});
+
+  const auto halos = haloExchange.exchange({lowerParticle, upperParticle}, domain, haloWidth);
+
+  ASSERT_EQ(halos.size(), 2);
+  EXPECT_EQ(halos[0].getID(), upperParticle.getID());
+  EXPECT_NEAR(halos[0].getR()[1], -0.1, 1e-12);
+  EXPECT_EQ(halos[1].getID(), lowerParticle.getID());
+  EXPECT_NEAR(halos[1].getR()[1], 1.1, 1e-12);
+}
+
 TEST(HaloExchangeTest, NoneBoundarySuppressesGlobalHaloButKeepsInternalHalo) {
   int rank = 0;
   int numberOfRanks = 0;

@@ -4,12 +4,13 @@
 
 #include <array>
 #include <cstddef>
+#include <utility>
 #include <vector>
 
 #include "distributed_autopas/Communication.h"
 #include "distributed_autopas/DomainDecomposition.h"
-#include "distributed_autopas/ParticleSerialization.h"
 #include "distributed_autopas/PerformanceCounters.h"
+#include "distributed_autopas/ParticleSerialization.h"
 
 namespace dap {
 
@@ -92,10 +93,23 @@ class HaloExchange {
       DAP_DETAILED_TIMER_STOP(_performanceCounters, haloSelection);
       DAP_DETAILED_ADD(_performanceCounters, haloParticlesSent, sendPreceding.size() + sendSucceeding.size());
 
-      auto exchangeRequest = beginLeftRightExchange<Particle, Serializer>(
-          _comm, precedingNeighbor, succeedingNeighbor, sendPreceding, sendSucceeding,
-          300 + static_cast<int>(dimension) * 10 DAP_DETAILED_COUNTERS_ARGUMENT(_performanceCounters));
-      auto exchange = finishLeftRightExchange(exchangeRequest DAP_DETAILED_COUNTERS_ARGUMENT(_performanceCounters));
+      LeftRightExchange<Particle> exchange;
+
+      if (domain.processGrid()[dimension] == 1) {
+        // For a periodic dimension that is not decomposed, both neighbors are this rank.
+        // Reproduce the same left/right exchange locally instead of serializing the
+        // particles and sending a potentially large payload through MPI to ourselves.
+        // sendSucceeding arrives from the preceding side and sendPreceding from the
+        // succeeding side, matching beginLeftRightExchange() semantics.
+        exchange.recvFromLeft = std::move(sendSucceeding);
+        exchange.recvFromRight = std::move(sendPreceding);
+      } else {
+        auto exchangeRequest = beginLeftRightExchange<Particle, Serializer>(
+            _comm, precedingNeighbor, succeedingNeighbor, sendPreceding, sendSucceeding,
+            300 + static_cast<int>(dimension) * 10 DAP_DETAILED_COUNTERS_ARGUMENT(_performanceCounters));
+        exchange = finishLeftRightExchange(exchangeRequest DAP_DETAILED_COUNTERS_ARGUMENT(_performanceCounters));
+      }
+
       DAP_DETAILED_ADD(_performanceCounters, haloParticlesReceived,
                        exchange.recvFromLeft.size() + exchange.recvFromRight.size());
 

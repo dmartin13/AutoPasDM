@@ -252,6 +252,11 @@ add_dap_mpi_gtest(
 )
 add_dap_mpi_gtest(
     distributed_autopas_halo_exchange_tests
+    HaloExchangeTest.CreatesPeriodicHalosLocallyForUndecomposedDimension
+    4
+)
+add_dap_mpi_gtest(
+    distributed_autopas_halo_exchange_tests
     HaloExchangeTest.NoneBoundarySuppressesGlobalHaloButKeepsInternalHalo
     8
 )
