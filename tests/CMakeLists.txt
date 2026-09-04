@@ -133,6 +133,14 @@ target_link_libraries(
 
 target_compile_features(distributed_autopas_particle_migration_tests PRIVATE cxx_std_20)
 
+if(DISTRIBUTED_AUTOPAS_ENABLE_DETAILED_TIMERS)
+    add_dap_mpi_gtest(
+        distributed_autopas_particle_migration_tests
+        ParticleMigrationTest.SkipsNeighborExchangeWhenNoRankHasEmigrants
+        4
+    )
+endif()
+
 add_dap_mpi_gtest(
     distributed_autopas_particle_migration_tests
     ParticleMigrationTest.KeepsParticlesThatRemainInLocalDomain

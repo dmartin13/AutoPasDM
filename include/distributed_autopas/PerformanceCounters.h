@@ -32,8 +32,10 @@ struct PerformanceCountersSnapshot {
   std::uint64_t addHaloParticlesNs{};
 
   std::uint64_t migrationClassificationNs{};
+  std::uint64_t haloInitialCopyNs{};
   std::uint64_t haloSelectionNs{};
   std::uint64_t haloPeriodicShiftNs{};
+  std::uint64_t haloBufferInsertionNs{};
   std::uint64_t communicationPackNs{};
   std::uint64_t communicationCountExchangeNs{};
   std::uint64_t communicationPayloadWaitNs{};
@@ -98,8 +100,10 @@ struct PerformanceCounters {
 
 #ifdef DAP_ENABLE_DETAILED_TIMERS
   autopas::utils::Timer migrationClassification;
+  autopas::utils::Timer haloInitialCopy;
   autopas::utils::Timer haloSelection;
   autopas::utils::Timer haloPeriodicShift;
+  autopas::utils::Timer haloBufferInsertion;
   autopas::utils::Timer communicationPack;
   autopas::utils::Timer communicationCountExchange;
   autopas::utils::Timer communicationPayloadWait;
@@ -129,8 +133,10 @@ struct PerformanceCounters {
 
 #ifdef DAP_ENABLE_DETAILED_TIMERS
     result.migrationClassificationNs = static_cast<std::uint64_t>(migrationClassification.getTotalTime());
+    result.haloInitialCopyNs = static_cast<std::uint64_t>(haloInitialCopy.getTotalTime());
     result.haloSelectionNs = static_cast<std::uint64_t>(haloSelection.getTotalTime());
     result.haloPeriodicShiftNs = static_cast<std::uint64_t>(haloPeriodicShift.getTotalTime());
+    result.haloBufferInsertionNs = static_cast<std::uint64_t>(haloBufferInsertion.getTotalTime());
     result.communicationPackNs = static_cast<std::uint64_t>(communicationPack.getTotalTime());
     result.communicationCountExchangeNs = static_cast<std::uint64_t>(communicationCountExchange.getTotalTime());
     result.communicationPayloadWaitNs = static_cast<std::uint64_t>(communicationPayloadWait.getTotalTime());
@@ -162,8 +168,10 @@ struct PerformanceCounters {
 
 #ifdef DAP_ENABLE_DETAILED_TIMERS
     migrationClassification.reset();
+    haloInitialCopy.reset();
     haloSelection.reset();
     haloPeriodicShift.reset();
+    haloBufferInsertion.reset();
     communicationPack.reset();
     communicationCountExchange.reset();
     communicationPayloadWait.reset();

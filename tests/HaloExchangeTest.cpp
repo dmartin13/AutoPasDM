@@ -192,7 +192,6 @@ TEST(HaloExchangeTest, ShiftsPeriodicCornerHaloAcrossAllDimensions) {
   }
 }
 
-
 TEST(HaloExchangeTest, CreatesPeriodicHalosLocallyForUndecomposedDimension) {
   int rank = 0;
   int numberOfRanks = 0;

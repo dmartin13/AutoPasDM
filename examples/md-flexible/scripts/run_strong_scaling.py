@@ -60,8 +60,10 @@ DAP_COARSE_TIMERS = {
 
 DAP_DETAILED_TIMERS = {
     "migration_classify": "DAP MigrationClassify",
+    "halo_initial_copy": "DAP HaloInitialCopy",
     "halo_selection": "DAP HaloSelection",
     "halo_periodic_shift": "DAP HaloPeriodicShift",
+    "halo_buffer_insertion": "DAP HaloBufferInsertion",
     "comm_pack": "DAP CommunicationPack",
     "count_exchange": "DAP CountExchange",
     "payload_wait": "DAP PayloadWait",

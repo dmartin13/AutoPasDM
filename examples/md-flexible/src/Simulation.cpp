@@ -644,8 +644,10 @@ void Simulation::logMeasurements() {
   const long dapAddHaloParticles = accumulateDapTime(dapPerformanceCounters.addHaloParticlesNs);
 #ifdef DAP_ENABLE_DETAILED_TIMERS
   const long dapMigrationClassification = accumulateDapTime(dapPerformanceCounters.migrationClassificationNs);
+  const long dapHaloInitialCopy = accumulateDapTime(dapPerformanceCounters.haloInitialCopyNs);
   const long dapHaloSelection = accumulateDapTime(dapPerformanceCounters.haloSelectionNs);
   const long dapHaloPeriodicShift = accumulateDapTime(dapPerformanceCounters.haloPeriodicShiftNs);
+  const long dapHaloBufferInsertion = accumulateDapTime(dapPerformanceCounters.haloBufferInsertionNs);
   const long dapCommunicationPack = accumulateDapTime(dapPerformanceCounters.communicationPackNs);
   const long dapCommunicationCountExchange = accumulateDapTime(dapPerformanceCounters.communicationCountExchangeNs);
   const long dapCommunicationPayloadWait = accumulateDapTime(dapPerformanceCounters.communicationPayloadWaitNs);
@@ -733,9 +735,13 @@ void Simulation::logMeasurements() {
 #ifdef DAP_ENABLE_DETAILED_TIMERS
     std::cout << timerToString("          DAP MigrationClassify   ", dapMigrationClassification, maximumNumberOfDigits,
                                dapMigration);
+    std::cout << timerToString("          DAP HaloInitialCopy     ", dapHaloInitialCopy, maximumNumberOfDigits,
+                               dapHaloExchange);
     std::cout << timerToString("          DAP HaloSelection       ", dapHaloSelection, maximumNumberOfDigits,
                                dapHaloExchange);
     std::cout << timerToString("          DAP HaloPeriodicShift   ", dapHaloPeriodicShift, maximumNumberOfDigits,
+                               dapHaloExchange);
+    std::cout << timerToString("          DAP HaloBufferInsertion ", dapHaloBufferInsertion, maximumNumberOfDigits,
                                dapHaloExchange);
     const long dapCommunicationTotal = dapMigration + dapHaloExchange;
     std::cout << timerToString("          DAP CommunicationPack   ", dapCommunicationPack, maximumNumberOfDigits,

@@ -39,7 +39,11 @@ class ParticleMigration {
    *
    * @param comm MPI communicator used for migration.
    */
-  explicit ParticleMigration(MPI_Comm comm) : _comm(comm) {}
+  explicit ParticleMigration(MPI_Comm comm) : _comm(comm) {
+    if (MPI_Comm_size(_comm, &_numberOfRanks) != MPI_SUCCESS) {
+      throw std::runtime_error("ParticleMigration: failed to query communicator size.");
+    }
+  }
 
 #ifdef DAP_ENABLE_DETAILED_TIMERS
   /**
@@ -48,8 +52,9 @@ class ParticleMigration {
    * @param comm MPI communicator used for migration.
    * @param performanceCounters Performance counter sink receiving migration and communication measurements.
    */
-  ParticleMigration(MPI_Comm comm, performance::PerformanceCounters *performanceCounters)
-      : _comm(comm), _performanceCounters(performanceCounters) {}
+  ParticleMigration(MPI_Comm comm, performance::PerformanceCounters *performanceCounters) : ParticleMigration(comm) {
+    _performanceCounters = performanceCounters;
+  }
 #endif
 
   /**
@@ -60,6 +65,13 @@ class ParticleMigration {
    */
   [[nodiscard]] std::vector<Particle> migrate(const std::vector<Particle> &emigrants,
                                               const DomainDecomposition &domain) const {
+    // In the common case that no rank has emigrants, avoid the staged neighbor
+    // count exchanges entirely. One small collective is cheaper than entering
+    // every x/y/z migration stage with empty send buffers.
+    if (not globalMigrationRequired(emigrants)) {
+      return {};
+    }
+
     auto remainingParticles = emigrants;
     bool crossedReflectiveBoundary = false;
 
@@ -184,7 +196,32 @@ class ParticleMigration {
   }
 
  private:
+  /**
+   * Check collectively whether any rank has particles that require migration.
+   *
+   * A single-rank run is handled locally to avoid introducing an unnecessary
+   * collective in the serial case. For multiple ranks, every process participates
+   * in one reduction so ranks without local emigrants still learn whether a
+   * neighbor may send particles.
+   *
+   * @param emigrants Particles that left this rank's local ownership box.
+   */
+  [[nodiscard]] bool globalMigrationRequired(const std::vector<Particle> &emigrants) const {
+    if (_numberOfRanks == 1) {
+      return not emigrants.empty();
+    }
+
+    const int localHasEmigrants = emigrants.empty() ? 0 : 1;
+    int globalHasEmigrants = 0;
+    if (MPI_Allreduce(&localHasEmigrants, &globalHasEmigrants, 1, MPI_INT, MPI_MAX, _comm) != MPI_SUCCESS) {
+      throw std::runtime_error("ParticleMigration: failed to determine whether migration is required.");
+    }
+
+    return globalHasEmigrants != 0;
+  }
+
   MPI_Comm _comm{MPI_COMM_WORLD};
+  int _numberOfRanks{1};
 #ifdef DAP_ENABLE_DETAILED_TIMERS
   performance::PerformanceCounters *_performanceCounters{nullptr};
 #endif

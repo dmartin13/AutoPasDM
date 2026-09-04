@@ -9,8 +9,8 @@
 
 #include "distributed_autopas/Communication.h"
 #include "distributed_autopas/DomainDecomposition.h"
-#include "distributed_autopas/PerformanceCounters.h"
 #include "distributed_autopas/ParticleSerialization.h"
+#include "distributed_autopas/PerformanceCounters.h"
 
 namespace dap {
 
@@ -60,7 +60,9 @@ class HaloExchange {
    */
   [[nodiscard]] std::vector<Particle> exchange(const std::vector<Particle> &ownedParticles,
                                                const DomainDecomposition &domain, double haloWidth) const {
+    DAP_DETAILED_TIMER_START(_performanceCounters, haloInitialCopy);
     std::vector<Particle> candidates = ownedParticles;
+    DAP_DETAILED_TIMER_STOP(_performanceCounters, haloInitialCopy);
     std::vector<Particle> haloParticles;
 
     for (std::size_t dimension = 0; dimension < 3; ++dimension) {
@@ -118,6 +120,7 @@ class HaloExchange {
       shiftPeriodicImages(exchange.recvFromRight, domain, dimension, false);
       DAP_DETAILED_TIMER_STOP(_performanceCounters, haloPeriodicShift);
 
+      DAP_DETAILED_TIMER_START(_performanceCounters, haloBufferInsertion);
       candidates.reserve(candidates.size() + exchange.recvFromLeft.size() + exchange.recvFromRight.size());
       haloParticles.reserve(haloParticles.size() + exchange.recvFromLeft.size() + exchange.recvFromRight.size());
 
@@ -126,6 +129,7 @@ class HaloExchange {
 
       candidates.insert(candidates.end(), exchange.recvFromLeft.begin(), exchange.recvFromLeft.end());
       candidates.insert(candidates.end(), exchange.recvFromRight.begin(), exchange.recvFromRight.end());
+      DAP_DETAILED_TIMER_STOP(_performanceCounters, haloBufferInsertion);
     }
 
     return haloParticles;

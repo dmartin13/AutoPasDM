@@ -46,6 +46,24 @@ struct TestContext {
   TestContext() : domain(makeDomain(rank, numberOfRanks)), migration(MPI_COMM_WORLD) {}
 };
 
+#ifdef DAP_ENABLE_DETAILED_TIMERS
+TEST(ParticleMigrationTest, SkipsNeighborExchangeWhenNoRankHasEmigrants) {
+  int rank = 0;
+  int numberOfRanks = 0;
+  auto domain = makeDomain(rank, numberOfRanks);
+  ASSERT_EQ(numberOfRanks, 4);
+
+  dap::performance::PerformanceCounters performanceCounters;
+  dap::ParticleMigration<Particle> migration(MPI_COMM_WORLD, &performanceCounters);
+
+  const auto immigrants = migration.migrate({}, domain);
+  const auto snapshot = performanceCounters.snapshot();
+
+  EXPECT_TRUE(immigrants.empty());
+  EXPECT_EQ(snapshot.communicationCountExchangeNs, 0);
+}
+#endif
+
 TEST(ParticleMigrationTest, KeepsParticlesThatRemainInLocalDomain) {
   TestContext context;
   ASSERT_EQ(context.numberOfRanks, 4);

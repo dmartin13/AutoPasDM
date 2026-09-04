@@ -22,6 +22,15 @@ TEST(PerformanceCountersTest, SnapshotStartsAtZeroAndCanBeReset) {
 #endif
 
 #ifdef DAP_ENABLE_DETAILED_TIMERS
+  performanceCounters.haloInitialCopy.start();
+  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  performanceCounters.haloInitialCopy.stop();
+  performanceCounters.haloBufferInsertion.start();
+  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  performanceCounters.haloBufferInsertion.stop();
+  EXPECT_GT(performanceCounters.snapshot().haloInitialCopyNs, 0);
+  EXPECT_GT(performanceCounters.snapshot().haloBufferInsertionNs, 0);
+
   performanceCounters.haloParticlesSent = 7;
   performanceCounters.communicationBytesSent = 128;
   EXPECT_EQ(performanceCounters.snapshot().haloParticlesSent, 7);
@@ -31,6 +40,8 @@ TEST(PerformanceCountersTest, SnapshotStartsAtZeroAndCanBeReset) {
   performanceCounters.reset();
   const auto resetSnapshot = performanceCounters.snapshot();
   EXPECT_EQ(resetSnapshot.updateContainerNs, 0);
+  EXPECT_EQ(resetSnapshot.haloInitialCopyNs, 0);
+  EXPECT_EQ(resetSnapshot.haloBufferInsertionNs, 0);
   EXPECT_EQ(resetSnapshot.haloParticlesSent, 0);
   EXPECT_EQ(resetSnapshot.communicationBytesSent, 0);
 }
