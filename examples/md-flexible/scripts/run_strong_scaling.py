@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import argparse
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 from pathlib import Path
 import re
@@ -43,6 +43,39 @@ import time
 
 
 TIMER_RE = re.compile(r"^\s*(.*?)\s*:\s*(\d+)\s+ns\b", re.MULTILINE)
+COUNTER_RE = re.compile(r"^\s*(.*?)\s*:\s*(\d+)\s*$", re.MULTILINE)
+
+DAP_COARSE_TIMERS = {
+    "core_sync": "DAP CoreSynchronization",
+    "update_container": "DAP UpdateContainer",
+    "load_balancing": "DAP LoadBalancing",
+    "boundary_sync": "DAP BoundarySync",
+    "resize_box": "DAP ResizeBox",
+    "migration": "DAP Migration",
+    "add_migrated": "DAP AddMigratedParticles",
+    "collect_owned": "DAP CollectOwnedParticles",
+    "halo_exchange": "DAP HaloExchange",
+    "add_halos": "DAP AddHaloParticles",
+}
+
+DAP_DETAILED_TIMERS = {
+    "migration_classify": "DAP MigrationClassify",
+    "halo_selection": "DAP HaloSelection",
+    "halo_periodic_shift": "DAP HaloPeriodicShift",
+    "comm_pack": "DAP CommunicationPack",
+    "count_exchange": "DAP CountExchange",
+    "payload_wait": "DAP PayloadWait",
+    "comm_unpack": "DAP CommunicationUnpack",
+}
+
+DAP_COUNTERS = {
+    "migration_sent": "Migration particles sent",
+    "migration_received": "Migration particles received",
+    "halo_sent": "Halo particles sent",
+    "halo_received": "Halo particles received",
+    "bytes_sent": "Payload bytes sent",
+    "bytes_received": "Payload bytes received",
+}
 
 
 @dataclass
@@ -55,6 +88,8 @@ class RunResult:
     simulate_accumulated_seconds: float
     force_accumulated_seconds: float
     synchronization_accumulated_seconds: float
+    dap_timer_accumulated_seconds: dict[str, float] = field(default_factory=dict)
+    dap_counters: dict[str, int] = field(default_factory=dict)
 
     @property
     def simulate_seconds_per_rank(self) -> float:
@@ -68,6 +103,9 @@ class RunResult:
     def synchronization_seconds_per_rank(self) -> float:
         return self.synchronization_accumulated_seconds / self.ranks
 
+    def dap_timer_seconds_per_rank(self, timer: str) -> float:
+        return self.dap_timer_accumulated_seconds[timer] / self.ranks
+
 
 @dataclass
 class MedianResult:
@@ -78,6 +116,8 @@ class MedianResult:
     simulate_seconds_per_rank: float
     force_seconds_per_rank: float
     synchronization_seconds_per_rank: float
+    dap_timer_seconds_per_rank: dict[str, float] = field(default_factory=dict)
+    dap_counters: dict[str, float] = field(default_factory=dict)
 
 
 def parse_args() -> argparse.Namespace:
@@ -143,6 +183,33 @@ def parse_timer_ns(log: str, timer_name: str, *, required: bool = True) -> int:
     return 0
 
 
+def parse_counter(log: str, counter_name: str, *, required: bool = True) -> int:
+    counters = {name.strip(): int(value) for name, value in COUNTER_RE.findall(log)}
+    if counter_name in counters:
+        return counters[counter_name]
+    if required:
+        available = ", ".join(sorted(counters))
+        raise RuntimeError(f'Could not find counter "{counter_name}". Available counters: {available}')
+    return 0
+
+
+def parse_optional_dap_timers(log: str) -> dict[str, float]:
+    timers: dict[str, float] = {}
+    for key, label in {**DAP_COARSE_TIMERS, **DAP_DETAILED_TIMERS}.items():
+        value_ns = parse_timer_ns(log, label, required=False)
+        if value_ns or re.search(rf"^\s*{re.escape(label)}\s*:", log, re.MULTILINE):
+            timers[key] = value_ns * 1e-9
+    return timers
+
+
+def parse_optional_dap_counters(log: str) -> dict[str, int]:
+    counters: dict[str, int] = {}
+    for key, label in DAP_COUNTERS.items():
+        if re.search(rf"^\s*{re.escape(label)}\s*:", log, re.MULTILINE):
+            counters[key] = parse_counter(log, label)
+    return counters
+
+
 def synchronization_ns(log: str, implementation: str) -> int:
     if implementation == "distributed":
         return parse_timer_ns(log, "DistributedSynchronization")
@@ -205,6 +272,8 @@ def run_once(
         simulate_accumulated_seconds=parse_timer_ns(result.stdout, "Simulate") * 1e-9,
         force_accumulated_seconds=parse_timer_ns(result.stdout, "ForceUpdateTotal") * 1e-9,
         synchronization_accumulated_seconds=synchronization_ns(result.stdout, implementation) * 1e-9,
+        dap_timer_accumulated_seconds=parse_optional_dap_timers(result.stdout) if implementation == "distributed" else {},
+        dap_counters=parse_optional_dap_counters(result.stdout) if implementation == "distributed" else {},
     )
 
 
@@ -215,6 +284,8 @@ def median_results(results: list[RunResult]) -> dict[tuple[str, int], MedianResu
 
     medians: dict[tuple[str, int], MedianResult] = {}
     for (implementation, ranks), group in grouped.items():
+        dap_timer_keys = sorted(set().union(*(result.dap_timer_accumulated_seconds.keys() for result in group)))
+        dap_counter_keys = sorted(set().union(*(result.dap_counters.keys() for result in group)))
         medians[(implementation, ranks)] = MedianResult(
             implementation=implementation,
             ranks=ranks,
@@ -225,6 +296,18 @@ def median_results(results: list[RunResult]) -> dict[tuple[str, int], MedianResu
             synchronization_seconds_per_rank=statistics.median(
                 result.synchronization_seconds_per_rank for result in group
             ),
+            dap_timer_seconds_per_rank={
+                key: statistics.median(
+                    result.dap_timer_seconds_per_rank(key)
+                    for result in group
+                    if key in result.dap_timer_accumulated_seconds
+                )
+                for key in dap_timer_keys
+            },
+            dap_counters={
+                key: statistics.median(result.dap_counters[key] for result in group if key in result.dap_counters)
+                for key in dap_counter_keys
+            },
         )
     return medians
 
@@ -238,6 +321,88 @@ def scaling_values(
     ideal_speedup = ranks / baseline_ranks
     efficiency = speedup / ideal_speedup
     return speedup, efficiency
+
+
+def available_dap_timer_keys(
+    medians: dict[tuple[str, int], MedianResult], rank_counts: list[int], candidates: dict[str, str]
+) -> list[str]:
+    return [
+        key
+        for key in candidates
+        if any(key in medians[("distributed", ranks)].dap_timer_seconds_per_rank for ranks in rank_counts)
+    ]
+
+
+def print_dap_timer_table(
+    title: str,
+    medians: dict[tuple[str, int], MedianResult],
+    rank_counts: list[int],
+    timer_keys: list[str],
+    labels: dict[str, str],
+) -> None:
+    if not timer_keys:
+        return
+
+    short_labels = {
+        "core_sync": "core sync",
+        "update_container": "update",
+        "load_balancing": "load bal",
+        "boundary_sync": "boundary",
+        "resize_box": "resize",
+        "migration": "migration",
+        "add_migrated": "add migr",
+        "collect_owned": "collect",
+        "halo_exchange": "halo",
+        "add_halos": "add halo",
+        "migration_classify": "migr class",
+        "halo_selection": "halo select",
+        "halo_periodic_shift": "periodic",
+        "comm_pack": "pack",
+        "count_exchange": "count",
+        "payload_wait": "wait",
+        "comm_unpack": "unpack",
+    }
+
+    print(f"\n{title} (median seconds / rank):")
+    header = f"  {'ranks':>5s}" + "".join(f" {short_labels.get(key, labels[key]):>11s}" for key in timer_keys)
+    print(header)
+    print(f"  {'-' * 5}" + "".join(f" {'-' * 11}" for _ in timer_keys))
+    for ranks in rank_counts:
+        result = medians[("distributed", ranks)]
+        values = []
+        for key in timer_keys:
+            value = result.dap_timer_seconds_per_rank.get(key)
+            values.append(f" {value:11.6f}" if value is not None else f" {'-':>11s}")
+        print(f"  {ranks:5d}" + "".join(values))
+
+
+def print_dap_counter_table(
+    medians: dict[tuple[str, int], MedianResult], rank_counts: list[int]
+) -> None:
+    keys = [
+        key
+        for key in DAP_COUNTERS
+        if any(key in medians[("distributed", ranks)].dap_counters for ranks in rank_counts)
+    ]
+    if not keys:
+        return
+
+    print("\nDistributedAutoPas communication counters (median global sum):")
+    print(
+        f"  {'ranks':>5s} {'migr sent':>11s} {'migr recv':>11s} "
+        f"{'halo sent':>11s} {'halo recv':>11s} {'bytes sent':>14s} {'bytes recv':>14s}"
+    )
+    print(f"  {'-' * 5} {'-' * 11} {'-' * 11} {'-' * 11} {'-' * 11} {'-' * 14} {'-' * 14}")
+    for ranks in rank_counts:
+        counters = medians[("distributed", ranks)].dap_counters
+        def formatted(key: str) -> str:
+            value = counters.get(key)
+            return "-" if value is None else f"{value:.0f}"
+        print(
+            f"  {ranks:5d} {formatted('migration_sent'):>11s} {formatted('migration_received'):>11s} "
+            f"{formatted('halo_sent'):>11s} {formatted('halo_received'):>11s} "
+            f"{formatted('bytes_sent'):>14s} {formatted('bytes_received'):>14s}"
+        )
 
 
 def print_summary(
@@ -291,6 +456,14 @@ def print_summary(
             f"{sync_ratio:12.3f}"
         )
 
+    coarse_keys = available_dap_timer_keys(medians, rank_counts, DAP_COARSE_TIMERS)
+    detailed_keys = available_dap_timer_keys(medians, rank_counts, DAP_DETAILED_TIMERS)
+    print_dap_timer_table("DistributedAutoPas coarse breakdown", medians, rank_counts, coarse_keys, DAP_COARSE_TIMERS)
+    print_dap_timer_table(
+        "DistributedAutoPas detailed breakdown", medians, rank_counts, detailed_keys, DAP_DETAILED_TIMERS
+    )
+    print_dap_counter_table(medians, rank_counts)
+
     print("\nWall-clock diagnostics:")
     print(f"  {'ranks':>5s} {'ref internal':>13s} {'dap internal':>13s} {'ref external':>13s} {'dap external':>13s}")
     print(f"  {'-' * 5} {'-' * 13} {'-' * 13} {'-' * 13} {'-' * 13}")
@@ -308,11 +481,18 @@ def print_summary(
     print("  ref/dap > 1 means DistributedAutoPas was faster for that metric.")
     print("  Internal scaling uses Simulate / rank and excludes MPI launcher startup.")
     print("  OMP_NUM_THREADS is fixed for all runs so the experiment varies MPI ranks only.")
+    if available_dap_timer_keys(medians, rank_counts, DAP_COARSE_TIMERS):
+        print("  DAP timer values are accumulated over MPI ranks by md-flexible and divided by ranks here.")
+    if any(medians[("distributed", ranks)].dap_counters for ranks in rank_counts):
+        print("  DAP communication counters are global sums over all MPI ranks, not per-rank values.")
 
 
 def write_raw_csv(path: Path, results: list[RunResult]) -> None:
     path = path.expanduser().resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
+    dap_timer_keys = sorted(set().union(*(result.dap_timer_accumulated_seconds.keys() for result in results)))
+    dap_counter_keys = sorted(set().union(*(result.dap_counters.keys() for result in results)))
+
     with path.open("w", newline="", encoding="utf-8") as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow(
@@ -328,6 +508,9 @@ def write_raw_csv(path: Path, results: list[RunResult]) -> None:
                 "force_seconds_per_rank",
                 "synchronization_accumulated_seconds",
                 "synchronization_seconds_per_rank",
+                *[f"dap_{key}_accumulated_seconds" for key in dap_timer_keys],
+                *[f"dap_{key}_seconds_per_rank" for key in dap_timer_keys],
+                *[f"dap_{key}" for key in dap_counter_keys],
             ]
         )
         for result in results:
@@ -344,6 +527,19 @@ def write_raw_csv(path: Path, results: list[RunResult]) -> None:
                     f"{result.force_seconds_per_rank:.12g}",
                     f"{result.synchronization_accumulated_seconds:.12g}",
                     f"{result.synchronization_seconds_per_rank:.12g}",
+                    *[
+                        f"{result.dap_timer_accumulated_seconds[key]:.12g}"
+                        if key in result.dap_timer_accumulated_seconds
+                        else ""
+                        for key in dap_timer_keys
+                    ],
+                    *[
+                        f"{result.dap_timer_seconds_per_rank(key):.12g}"
+                        if key in result.dap_timer_accumulated_seconds
+                        else ""
+                        for key in dap_timer_keys
+                    ],
+                    *[str(result.dap_counters[key]) if key in result.dap_counters else "" for key in dap_counter_keys],
                 ]
             )
     print(f"\nWrote per-run measurements to {path}")
@@ -355,6 +551,9 @@ def write_summary_csv(
     path = path.expanduser().resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     baseline_ranks = rank_counts[0]
+    distributed_results = [medians[("distributed", ranks)] for ranks in rank_counts]
+    dap_timer_keys = sorted(set().union(*(result.dap_timer_seconds_per_rank.keys() for result in distributed_results)))
+    dap_counter_keys = sorted(set().union(*(result.dap_counters.keys() for result in distributed_results)))
 
     with path.open("w", newline="", encoding="utf-8") as csv_file:
         writer = csv.writer(csv_file)
@@ -369,6 +568,8 @@ def write_summary_csv(
                 "parallel_efficiency",
                 "force_seconds_per_rank",
                 "synchronization_seconds_per_rank",
+                *[f"dap_{key}_seconds_per_rank" for key in dap_timer_keys],
+                *[f"dap_{key}" for key in dap_counter_keys],
             ]
         )
         for ranks in rank_counts:
@@ -386,6 +587,16 @@ def write_summary_csv(
                         f"{efficiency:.12g}",
                         f"{result.force_seconds_per_rank:.12g}",
                         f"{result.synchronization_seconds_per_rank:.12g}",
+                        *[
+                            f"{result.dap_timer_seconds_per_rank[key]:.12g}"
+                            if key in result.dap_timer_seconds_per_rank
+                            else ""
+                            for key in dap_timer_keys
+                        ],
+                        *[
+                            f"{result.dap_counters[key]:.12g}" if key in result.dap_counters else ""
+                            for key in dap_counter_keys
+                        ],
                     ]
                 )
     print(f"Wrote median scaling results to {path}")

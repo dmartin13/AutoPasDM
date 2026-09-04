@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 #include "TypeDefinitions.h"
 #include "autopas/AutoPasDecl.h"
@@ -626,6 +627,43 @@ void Simulation::logMeasurements() {
   const long migratingParticleExchange = accumulateTime(_timers.migratingParticleExchange.getTotalTime());
   const long loadBalancing = accumulateTime(_timers.loadBalancing.getTotalTime());
   const long distributedSynchronization = accumulateTime(_timers.distributedSynchronization.getTotalTime());
+#ifdef DAP_ENABLE_TIMERS
+  const auto dapPerformanceCounters = _distributedAutoPasContainer->getPerformanceCountersSnapshot();
+  const auto accumulateDapTime = [&](std::uint64_t localTime) {
+    return static_cast<long>(_distributedAutoPasContainer->globalSum(localTime));
+  };
+  const long dapSynchronization = accumulateDapTime(dapPerformanceCounters.synchronizationNs);
+  const long dapUpdateContainer = accumulateDapTime(dapPerformanceCounters.updateContainerNs);
+  const long dapLoadBalancing = accumulateDapTime(dapPerformanceCounters.loadBalancingNs);
+  const long dapBoundarySynchronization = accumulateDapTime(dapPerformanceCounters.boundarySynchronizationNs);
+  const long dapResizeBox = accumulateDapTime(dapPerformanceCounters.resizeBoxNs);
+  const long dapMigration = accumulateDapTime(dapPerformanceCounters.migrationNs);
+  const long dapAddMigratedParticles = accumulateDapTime(dapPerformanceCounters.addMigratedParticlesNs);
+  const long dapOwnedParticleCollection = accumulateDapTime(dapPerformanceCounters.ownedParticleCollectionNs);
+  const long dapHaloExchange = accumulateDapTime(dapPerformanceCounters.haloExchangeNs);
+  const long dapAddHaloParticles = accumulateDapTime(dapPerformanceCounters.addHaloParticlesNs);
+#ifdef DAP_ENABLE_DETAILED_TIMERS
+  const long dapMigrationClassification = accumulateDapTime(dapPerformanceCounters.migrationClassificationNs);
+  const long dapHaloSelection = accumulateDapTime(dapPerformanceCounters.haloSelectionNs);
+  const long dapHaloPeriodicShift = accumulateDapTime(dapPerformanceCounters.haloPeriodicShiftNs);
+  const long dapCommunicationPack = accumulateDapTime(dapPerformanceCounters.communicationPackNs);
+  const long dapCommunicationCountExchange = accumulateDapTime(dapPerformanceCounters.communicationCountExchangeNs);
+  const long dapCommunicationPayloadWait = accumulateDapTime(dapPerformanceCounters.communicationPayloadWaitNs);
+  const long dapCommunicationUnpack = accumulateDapTime(dapPerformanceCounters.communicationUnpackNs);
+
+  const auto migrationParticlesSent =
+      _distributedAutoPasContainer->globalSum(dapPerformanceCounters.migrationParticlesSent);
+  const auto migrationParticlesReceived =
+      _distributedAutoPasContainer->globalSum(dapPerformanceCounters.migrationParticlesReceived);
+  const auto haloParticlesSent = _distributedAutoPasContainer->globalSum(dapPerformanceCounters.haloParticlesSent);
+  const auto haloParticlesReceived =
+      _distributedAutoPasContainer->globalSum(dapPerformanceCounters.haloParticlesReceived);
+  const auto communicationBytesSent =
+      _distributedAutoPasContainer->globalSum(dapPerformanceCounters.communicationBytesSent);
+  const auto communicationBytesReceived =
+      _distributedAutoPasContainer->globalSum(dapPerformanceCounters.communicationBytesReceived);
+#endif
+#endif
 #ifdef AUTOPAS_ENABLE_ENERGY_MEASUREMENTS
   const double totalEnergy = _distributedAutoPasContainer->globalSum(_totalEnergySensor.getJoules());
 #endif
@@ -671,6 +709,45 @@ void Simulation::logMeasurements() {
     std::cout << timerToString("    LoadBalancing                 ", loadBalancing, maximumNumberOfDigits, simulate);
     std::cout << timerToString("    DistributedSynchronization    ", distributedSynchronization, maximumNumberOfDigits,
                                simulate);
+#ifdef DAP_ENABLE_TIMERS
+    std::cout << timerToString("      DAP CoreSynchronization     ", dapSynchronization, maximumNumberOfDigits,
+                               distributedSynchronization);
+    std::cout << timerToString("        DAP UpdateContainer       ", dapUpdateContainer, maximumNumberOfDigits,
+                               dapSynchronization);
+    std::cout << timerToString("        DAP LoadBalancing         ", dapLoadBalancing, maximumNumberOfDigits,
+                               dapSynchronization);
+    std::cout << timerToString("        DAP BoundarySync          ", dapBoundarySynchronization, maximumNumberOfDigits,
+                               dapSynchronization);
+    std::cout << timerToString("        DAP ResizeBox             ", dapResizeBox, maximumNumberOfDigits,
+                               dapSynchronization);
+    std::cout << timerToString("        DAP Migration             ", dapMigration, maximumNumberOfDigits,
+                               dapSynchronization);
+    std::cout << timerToString("        DAP AddMigratedParticles  ", dapAddMigratedParticles, maximumNumberOfDigits,
+                               dapSynchronization);
+    std::cout << timerToString("        DAP CollectOwnedParticles ", dapOwnedParticleCollection, maximumNumberOfDigits,
+                               dapSynchronization);
+    std::cout << timerToString("        DAP HaloExchange          ", dapHaloExchange, maximumNumberOfDigits,
+                               dapSynchronization);
+    std::cout << timerToString("        DAP AddHaloParticles      ", dapAddHaloParticles, maximumNumberOfDigits,
+                               dapSynchronization);
+#ifdef DAP_ENABLE_DETAILED_TIMERS
+    std::cout << timerToString("          DAP MigrationClassify   ", dapMigrationClassification, maximumNumberOfDigits,
+                               dapMigration);
+    std::cout << timerToString("          DAP HaloSelection       ", dapHaloSelection, maximumNumberOfDigits,
+                               dapHaloExchange);
+    std::cout << timerToString("          DAP HaloPeriodicShift   ", dapHaloPeriodicShift, maximumNumberOfDigits,
+                               dapHaloExchange);
+    const long dapCommunicationTotal = dapMigration + dapHaloExchange;
+    std::cout << timerToString("          DAP CommunicationPack   ", dapCommunicationPack, maximumNumberOfDigits,
+                               dapCommunicationTotal);
+    std::cout << timerToString("          DAP CountExchange       ", dapCommunicationCountExchange,
+                               maximumNumberOfDigits, dapCommunicationTotal);
+    std::cout << timerToString("          DAP PayloadWait         ", dapCommunicationPayloadWait, maximumNumberOfDigits,
+                               dapCommunicationTotal);
+    std::cout << timerToString("          DAP CommunicationUnpack ", dapCommunicationUnpack, maximumNumberOfDigits,
+                               dapCommunicationTotal);
+#endif
+#endif
     std::cout << timerToString("  One iteration                 ", simulate / static_cast<long>(_iteration),
                                maximumNumberOfDigits, total);
 
@@ -684,6 +761,15 @@ void Simulation::logMeasurements() {
     auto mfups = static_cast<double>(_distributedAutoPasContainer->getLocalNumberOfOwnedParticles() * _iteration) *
                  1e-6 / (static_cast<double>(forceUpdateTotal) * 1e-9);  // 1e-9 for ns to s, 1e-6 for M in MFUPs
     std::cout << "MFUPs/sec                          : " << mfups << "\n";
+#ifdef DAP_ENABLE_DETAILED_TIMERS
+    std::cout << "DistributedAutoPas communication counters (sum over ranks):\n";
+    std::cout << "  Migration particles sent        : " << migrationParticlesSent << "\n";
+    std::cout << "  Migration particles received    : " << migrationParticlesReceived << "\n";
+    std::cout << "  Halo particles sent             : " << haloParticlesSent << "\n";
+    std::cout << "  Halo particles received         : " << haloParticlesReceived << "\n";
+    std::cout << "  Payload bytes sent              : " << communicationBytesSent << "\n";
+    std::cout << "  Payload bytes received          : " << communicationBytesReceived << "\n";
+#endif
 #ifdef AUTOPAS_ENABLE_DYNAMIC_CONTAINERS
     std::cout << "Mean Rebuild Frequency               : "
               << _distributedAutoPasContainer->getMeanLocalRebuildFrequency() << "\n";

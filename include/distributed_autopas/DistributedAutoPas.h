@@ -19,6 +19,7 @@
 #include "distributed_autopas/HaloExchange.h"
 #include "distributed_autopas/ParticleMigration.h"
 #include "distributed_autopas/ParticleSerialization.h"
+#include "distributed_autopas/PerformanceCounters.h"
 #include "distributed_autopas/Runtime.h"
 #include "distributed_autopas/load_balancing/InvertedPressureLoadBalancer.h"
 
@@ -157,7 +158,8 @@ class DistributedAutoPas {
                          const std::array<BoundaryType, 3> &boundaryTypes, Configurator &&configurator)
       : _runtime(runtime),
   _domain(runtime.rank(), runtime.size(), globalMin, globalMax, subdivideDimensions, boundaryTypes),
-  _particleMigration(runtime.communicator()), _haloExchange(runtime.communicator()), _cutoff(cutoff) {
+  _particleMigration(runtime.communicator() DAP_DETAILED_COUNTERS_ARGUMENT(&_performanceCounters)),
+  _haloExchange(runtime.communicator() DAP_DETAILED_COUNTERS_ARGUMENT(&_performanceCounters)), _cutoff(cutoff) {
     _autoPas.setBoxMin(_domain.localMin());
     _autoPas.setBoxMax(_domain.localMax());
     _autoPas.setCutoff(_cutoff);
@@ -488,6 +490,18 @@ class DistributedAutoPas {
    */
   [[nodiscard]] auto getCurrentLocalConfigurations() const { return _autoPas.getCurrentConfigs(); }
 
+  /**
+   * Get a local snapshot of the optional DistributedAutoPas performance counters.
+   *
+   * All values are zero when the library was built without DISTRIBUTED_AUTOPAS_ENABLE_TIMERS.
+   */
+  [[nodiscard]] performance::PerformanceCountersSnapshot getPerformanceCountersSnapshot() const {
+    return _performanceCounters.snapshot();
+  }
+
+  /** Reset all locally accumulated DistributedAutoPas performance counter values. */
+  void resetPerformanceCounters() { _performanceCounters.reset(); }
+
   /** Finalize the node-local AutoPas instance before the communication runtime is destroyed. */
   void finalize() { _autoPas.finalize(); }
 
@@ -496,7 +510,10 @@ class DistributedAutoPas {
    * Update the node-local container, migrate emigrants, and rebuild halo particles without changing the domain bounds.
    */
   void synchronizeParticles() {
+    DAP_SCOPED_TIMER(_performanceCounters.synchronization);
+    DAP_TIMER_START(_performanceCounters.updateContainer);
     auto emigrants = _autoPas.updateContainer();
+    DAP_TIMER_STOP(_performanceCounters.updateContainer);
     migrateAndExchangeHalos(std::move(emigrants));
   }
 
@@ -507,7 +524,10 @@ class DistributedAutoPas {
    * @param localMax Proposed upper corner of this rank's ownership box.
    */
   void synchronizeParticles(const std::array<double, 3> &localMin, const std::array<double, 3> &localMax) {
+    DAP_SCOPED_TIMER(_performanceCounters.synchronization);
+    DAP_TIMER_START(_performanceCounters.updateContainer);
     auto emigrants = _autoPas.updateContainer();
+    DAP_TIMER_STOP(_performanceCounters.updateContainer);
     resizeDomainAndMigrate(std::move(emigrants), localMin, localMax);
   }
 
@@ -517,7 +537,10 @@ class DistributedAutoPas {
    * @param localWork Computational work measured on this rank.
    */
   void synchronizeParticlesWithLoadBalancing(double localWork) {
+    DAP_SCOPED_TIMER(_performanceCounters.synchronization);
+    DAP_TIMER_START(_performanceCounters.updateContainer);
     auto emigrants = _autoPas.updateContainer();
+    DAP_TIMER_STOP(_performanceCounters.updateContainer);
 
     // There is no distributed geometry to balance with a single rank. Avoid creating
     // unnecessary plane communicators and keep the ordinary synchronization path.
@@ -526,12 +549,14 @@ class DistributedAutoPas {
       return;
     }
 
+    DAP_TIMER_START(_performanceCounters.loadBalancing);
     if (not _invertedPressureLoadBalancer.has_value()) {
       _invertedPressureLoadBalancer.emplace(_runtime.communicator(), _domain);
     }
 
     const double minWidth = 2. * (_cutoff + _autoPas.getVerletSkin());
     const auto balancedBox = _invertedPressureLoadBalancer->balance(localWork, _domain, minWidth);
+    DAP_TIMER_STOP(_performanceCounters.loadBalancing);
     resizeDomainAndMigrate(std::move(emigrants), balancedBox.min, balancedBox.max);
   }
 
@@ -547,9 +572,13 @@ class DistributedAutoPas {
     // Synchronize the complete Cartesian split positions before changing AutoPas.
     // targetRank() needs all process-plane boundaries once the grid is no longer uniform.
     auto resizedDomain = _domain;
+    DAP_TIMER_START(_performanceCounters.boundarySynchronization);
     resizedDomain.setSubdomainBoundaries(collectSubdomainBoundaries(localMin, localMax));
+    DAP_TIMER_STOP(_performanceCounters.boundarySynchronization);
 
+    DAP_TIMER_START(_performanceCounters.resizeBox);
     auto additionalEmigrants = _autoPas.resizeBox(resizedDomain.localMin(), resizedDomain.localMax());
+    DAP_TIMER_STOP(_performanceCounters.resizeBox);
     emigrants.reserve(emigrants.size() + additionalEmigrants.size());
     emigrants.insert(emigrants.end(), std::make_move_iterator(additionalEmigrants.begin()),
                      std::make_move_iterator(additionalEmigrants.end()));
@@ -615,22 +644,35 @@ class DistributedAutoPas {
    * @param emigrants Particles that no longer belong to the local ownership box.
    */
   void migrateAndExchangeHalos(std::vector<Particle> emigrants) {
+    DAP_TIMER_START(_performanceCounters.migration);
     auto immigrants = _particleMigration.migrate(emigrants, _domain);
-    _autoPas.addParticles(immigrants);
+    DAP_TIMER_STOP(_performanceCounters.migration);
 
+    DAP_TIMER_START(_performanceCounters.addMigratedParticles);
+    _autoPas.addParticles(immigrants);
+    DAP_TIMER_STOP(_performanceCounters.addMigratedParticles);
+
+    DAP_TIMER_START(_performanceCounters.ownedParticleCollection);
     std::vector<Particle> ownedParticles;
     ownedParticles.reserve(getLocalNumberOfOwnedParticles());
 
     for (auto iter = _autoPas.begin(autopas::IteratorBehavior::owned); iter.isValid(); ++iter) {
       ownedParticles.push_back(*iter);
     }
+    DAP_TIMER_STOP(_performanceCounters.ownedParticleCollection);
 
+    DAP_TIMER_START(_performanceCounters.haloExchange);
     auto haloParticles = _haloExchange.exchange(ownedParticles, _domain, _cutoff);
+    DAP_TIMER_STOP(_performanceCounters.haloExchange);
+
+    DAP_TIMER_START(_performanceCounters.addHaloParticles);
     _autoPas.addHaloParticles(haloParticles);
+    DAP_TIMER_STOP(_performanceCounters.addHaloParticles);
   }
 
   Runtime &_runtime;
   DomainDecomposition _domain;
+  [[no_unique_address]] performance::PerformanceCounters _performanceCounters;
   ParticleMigration<Particle, Serializer> _particleMigration;
   HaloExchange<Particle, Serializer> _haloExchange;
   std::optional<load_balancing::InvertedPressureLoadBalancer> _invertedPressureLoadBalancer;

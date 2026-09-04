@@ -9,6 +9,7 @@
 #include "distributed_autopas/Communication.h"
 #include "distributed_autopas/DomainDecomposition.h"
 #include "distributed_autopas/ParticleSerialization.h"
+#include "distributed_autopas/PerformanceCounters.h"
 
 namespace dap {
 
@@ -38,6 +39,17 @@ class HaloExchange {
    */
   explicit HaloExchange(MPI_Comm comm) : _comm(comm) {}
 
+#ifdef DAP_ENABLE_DETAILED_TIMERS
+  /**
+   * Construct a halo exchanger that records detailed performance counters.
+   *
+   * @param comm MPI communicator used for halo communication.
+   * @param performanceCounters Performance counter sink receiving halo and communication measurements.
+   */
+  HaloExchange(MPI_Comm comm, performance::PerformanceCounters *performanceCounters)
+      : _comm(comm), _performanceCounters(performanceCounters) {}
+#endif
+
   /**
    * Build all halo particles required by this rank for the current ownership geometry.
    *
@@ -62,6 +74,7 @@ class HaloExchange {
       std::vector<Particle> sendPreceding;
       std::vector<Particle> sendSucceeding;
 
+      DAP_DETAILED_TIMER_START(_performanceCounters, haloSelection);
       for (const auto &particle : candidates) {
         const auto &position = particle.getR();
 
@@ -76,13 +89,20 @@ class HaloExchange {
         }
       }
 
-      auto exchangeRequest =
-          beginLeftRightExchange<Particle, Serializer>(_comm, precedingNeighbor, succeedingNeighbor, sendPreceding,
-                                                       sendSucceeding, 300 + static_cast<int>(dimension) * 10);
-      auto exchange = finishLeftRightExchange(exchangeRequest);
+      DAP_DETAILED_TIMER_STOP(_performanceCounters, haloSelection);
+      DAP_DETAILED_ADD(_performanceCounters, haloParticlesSent, sendPreceding.size() + sendSucceeding.size());
 
+      auto exchangeRequest = beginLeftRightExchange<Particle, Serializer>(
+          _comm, precedingNeighbor, succeedingNeighbor, sendPreceding, sendSucceeding,
+          300 + static_cast<int>(dimension) * 10 DAP_DETAILED_COUNTERS_ARGUMENT(_performanceCounters));
+      auto exchange = finishLeftRightExchange(exchangeRequest DAP_DETAILED_COUNTERS_ARGUMENT(_performanceCounters));
+      DAP_DETAILED_ADD(_performanceCounters, haloParticlesReceived,
+                       exchange.recvFromLeft.size() + exchange.recvFromRight.size());
+
+      DAP_DETAILED_TIMER_START(_performanceCounters, haloPeriodicShift);
       shiftPeriodicImages(exchange.recvFromLeft, domain, dimension, true);
       shiftPeriodicImages(exchange.recvFromRight, domain, dimension, false);
+      DAP_DETAILED_TIMER_STOP(_performanceCounters, haloPeriodicShift);
 
       candidates.reserve(candidates.size() + exchange.recvFromLeft.size() + exchange.recvFromRight.size());
       haloParticles.reserve(haloParticles.size() + exchange.recvFromLeft.size() + exchange.recvFromRight.size());
@@ -131,6 +151,9 @@ class HaloExchange {
   }
 
   MPI_Comm _comm{MPI_COMM_WORLD};
+#ifdef DAP_ENABLE_DETAILED_TIMERS
+  performance::PerformanceCounters *_performanceCounters{nullptr};
+#endif
 };
 
 }  // namespace dap

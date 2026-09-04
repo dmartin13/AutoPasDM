@@ -30,6 +30,24 @@ option(
     ${_dap_build_tests_default}
 )
 
+# Optional compile-time performance counters. Both options are disabled
+# by default so production builds contain neither clock reads nor timer storage.
+option(
+    DISTRIBUTED_AUTOPAS_ENABLE_TIMERS
+    "Enable coarse DistributedAutoPas performance timers"
+    OFF
+)
+option(
+    DISTRIBUTED_AUTOPAS_ENABLE_DETAILED_TIMERS
+    "Enable detailed communication timers and counters (implies coarse timers)"
+    OFF
+)
+
+set(_dap_enable_timers ${DISTRIBUTED_AUTOPAS_ENABLE_TIMERS})
+if(DISTRIBUTED_AUTOPAS_ENABLE_DETAILED_TIMERS)
+    set(_dap_enable_timers ON)
+endif()
+
 # The bundled md-flexible example currently supports the single-site particle
 # model only. This value has to be known while AutoPas' applicationLibrary is
 # configured.
@@ -93,6 +111,13 @@ target_link_libraries(
 )
 
 target_compile_features(distributed_autopas PUBLIC cxx_std_20)
+
+if(_dap_enable_timers)
+    target_compile_definitions(distributed_autopas PUBLIC DAP_ENABLE_TIMERS)
+endif()
+if(DISTRIBUTED_AUTOPAS_ENABLE_DETAILED_TIMERS)
+    target_compile_definitions(distributed_autopas PUBLIC DAP_ENABLE_DETAILED_TIMERS)
+endif()
 
 if(DISTRIBUTED_AUTOPAS_BUILD_TESTS)
     enable_testing()
