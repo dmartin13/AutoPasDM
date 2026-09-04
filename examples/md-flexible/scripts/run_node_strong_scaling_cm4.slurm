@@ -15,7 +15,13 @@
 
 set -euo pipefail
 
-module load slurm_setup openmpi
+module purge
+
+module load slurm_setup
+module load stack/24.4.0
+module load llvm/19.1.3
+module load gcc/13.2.0
+module load openmpi/4.1.8-gcc13
 
 # Load the same compiler / MPI environment that was used to build both binaries.
 # For Intel MPI on CoolMUC-4 this is typically, for example:
