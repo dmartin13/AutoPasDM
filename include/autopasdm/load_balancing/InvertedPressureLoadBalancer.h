@@ -6,10 +6,10 @@
 #include <cstddef>
 #include <stdexcept>
 
-#include "distributed_autopas/DomainDecomposition.h"
-#include "distributed_autopas/load_balancing/InvertedPressure.h"
+#include "autopasdm/DomainDecomposition.h"
+#include "autopasdm/load_balancing/InvertedPressure.h"
 
-namespace dap::load_balancing {
+namespace autopasdm::load_balancing {
 
 /**
  * Local ownership bounds proposed by a load balancer.
@@ -35,7 +35,7 @@ struct LocalBox {
  * keeps the local boxes valid when both sides move in the same update.
  *
  * This class only proposes new local bounds. Applying them to DomainDecomposition
- * and AutoPas is deliberately handled by DistributedAutoPas.
+ * and AutoPas is deliberately handled by AutoPasDM.
  */
 class InvertedPressureLoadBalancer {
  public:
@@ -55,7 +55,7 @@ class InvertedPressureLoadBalancer {
           _coordinates[firstOtherDimension] * _processGrid[secondOtherDimension] + _coordinates[secondOtherDimension];
 
       if (MPI_Comm_split(_communicator, color, key, &_planeCommunicators[dimension]) != MPI_SUCCESS) {
-        throw std::runtime_error("DistributedAutoPas: failed to create process-plane communicator.");
+        throw std::runtime_error("AutoPasDM: failed to create process-plane communicator.");
       }
     }
   }
@@ -93,14 +93,14 @@ class InvertedPressureLoadBalancer {
    */
   [[nodiscard]] LocalBox balance(double localWork, const DomainDecomposition &domain, double minWidth) const {
     if (localWork < 0.) {
-      throw std::invalid_argument("DistributedAutoPas: load-balancing work must not be negative.");
+      throw std::invalid_argument("AutoPasDM: load-balancing work must not be negative.");
     }
     if (minWidth <= 0.) {
-      throw std::invalid_argument("DistributedAutoPas: minimum load-balancing domain width must be positive.");
+      throw std::invalid_argument("AutoPasDM: minimum load-balancing domain width must be positive.");
     }
     if (domain.processGrid() != _processGrid or domain.coordinates() != _coordinates) {
       throw std::invalid_argument(
-          "DistributedAutoPas: load balancer must be used with the process topology it was created for.");
+          "AutoPasDM: load balancer must be used with the process topology it was created for.");
     }
 
     const auto oldLocalMin = domain.localMin();
@@ -115,7 +115,7 @@ class InvertedPressureLoadBalancer {
       double planeWorkSum = 0.;
       if (MPI_Allreduce(&localWork, &planeWorkSum, 1, MPI_DOUBLE, MPI_SUM, _planeCommunicators[dimension]) !=
           MPI_SUCCESS) {
-        throw std::runtime_error("DistributedAutoPas: failed to reduce work in process plane.");
+        throw std::runtime_error("AutoPasDM: failed to reduce work in process plane.");
       }
 
       int ranksInPlane = 0;
@@ -154,7 +154,7 @@ class InvertedPressureLoadBalancer {
       }
 
       if (requestCount > 0 and MPI_Waitall(requestCount, requests.data(), MPI_STATUSES_IGNORE) != MPI_SUCCESS) {
-        throw std::runtime_error("DistributedAutoPas: failed to exchange neighboring process-plane work.");
+        throw std::runtime_error("AutoPasDM: failed to exchange neighboring process-plane work.");
       }
 
       if (hasPrecedingPlane) {
@@ -188,4 +188,4 @@ class InvertedPressureLoadBalancer {
   std::array<int, 3> _coordinates{0, 0, 0};
 };
 
-}  // namespace dap::load_balancing
+}  // namespace autopasdm::load_balancing

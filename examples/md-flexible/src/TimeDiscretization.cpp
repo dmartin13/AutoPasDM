@@ -164,7 +164,7 @@ void updateAngularVelocity(ParticleType &particle, const ParticlePropertiesLibra
 
 }  // namespace
 
-void calculatePositionsAndResetForces(dap::DistributedAutoPas<ParticleType> &container,
+void calculatePositionsAndResetForces(autopasdm::AutoPasDM<ParticleType> &container,
                                       const ParticlePropertiesLibraryType &particlePropertiesLibrary,
                                       const double &deltaT, const std::array<double, 3> &globalForce,
                                       bool fastParticlesThrow) {
@@ -218,7 +218,7 @@ void calculatePositionsAndResetForces(autopas::AutoPas<ParticleType> &autoPasCon
 #endif
 }
 
-void calculateQuaternionsAndResetTorques(dap::DistributedAutoPas<ParticleType> &container,
+void calculateQuaternionsAndResetTorques(autopasdm::AutoPasDM<ParticleType> &container,
                                          const ParticlePropertiesLibraryType &particlePropertiesLibrary,
                                          const double &deltaT, const std::array<double, 3> &globalForce) {
 #if MD_FLEXIBLE_MODE == MULTISITE
@@ -253,7 +253,7 @@ void calculateQuaternionsAndResetTorques(autopas::AutoPas<ParticleType> &autoPas
 #endif
 }
 
-void calculateVelocities(dap::DistributedAutoPas<ParticleType> &container,
+void calculateVelocities(autopasdm::AutoPasDM<ParticleType> &container,
                          const ParticlePropertiesLibraryType &particlePropertiesLibrary, const double &deltaT) {
   container.applyToOwnedParticles([&](auto &particle) { updateVelocity(particle, particlePropertiesLibrary, deltaT); });
 }
@@ -266,7 +266,7 @@ void calculateVelocities(autopas::AutoPas<ParticleType> &autoPasContainer,
   }
 }
 
-void calculateAngularVelocities(dap::DistributedAutoPas<ParticleType> &container,
+void calculateAngularVelocities(autopasdm::AutoPasDM<ParticleType> &container,
                                 const ParticlePropertiesLibraryType &particlePropertiesLibrary, const double &deltaT) {
 #if MD_FLEXIBLE_MODE == MULTISITE
   container.applyToOwnedParticles(

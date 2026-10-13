@@ -5,19 +5,19 @@
 #include "autopas/options/DataLayoutOption.h"
 #include "autopas/options/Newton3Option.h"
 #include "autopas/options/TraversalOption.h"
-#include "distributed_autopas/DistributedAutoPas.h"
-#include "distributed_autopas/PairCountingFunctor.h"
-#include "distributed_autopas/Particle.h"
-#include "distributed_autopas/Runtime.h"
+#include "autopasdm/AutoPasDM.h"
+#include "autopasdm/PairCountingFunctor.h"
+#include "autopasdm/Particle.h"
+#include "autopasdm/Runtime.h"
 
 int main(int argc, char **argv) {
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
 
   const std::array<double, 3> globalMin{0.0, 0.0, 0.0};
   const std::array<double, 3> globalMax{10.0, 10.0, 10.0};
   constexpr double cutoff = 0.5;
 
-  dap::DistributedAutoPas<dap::Particle> particles(runtime, globalMin, globalMax, cutoff, [](auto &autoPas) {
+  autopasdm::AutoPasDM<autopasdm::Particle> particles(runtime, globalMin, globalMax, cutoff, [](auto &autoPas) {
     autoPas.setAllowedContainers({autopas::ContainerOption::directSum});
     autoPas.setAllowedTraversals({autopas::TraversalOption::ds_sequential});
     autoPas.setAllowedDataLayouts({autopas::DataLayoutOption::aos});
@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   });
 
   for (int i = 0; i < 10; ++i) {
-    dap::Particle particle;
+    autopasdm::Particle particle;
     particle.setID(particles.rank() * 1000 + i);
 
     const double x0 = particles.localBoxMin()[0];
@@ -41,7 +41,8 @@ int main(int argc, char **argv) {
     particle.setR(position);
   });
 
-  dap::PairCountingFunctor<dap::Particle> pairCounter(cutoff, particles.localBoxMin(), particles.localBoxMax());
+  autopasdm::PairCountingFunctor<autopasdm::Particle> pairCounter(cutoff, particles.localBoxMin(),
+                                                                  particles.localBoxMax());
   particles.computeInteractions(&pairCounter);
 
   particles.barrier();

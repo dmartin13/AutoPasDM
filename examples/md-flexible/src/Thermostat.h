@@ -28,7 +28,7 @@ namespace detail {
 /**
  * Sum a particle-local quantity over owned particles.
  *
- * DistributedAutoPas provides this operation directly. The AutoPas fallback is
+ * AutoPasDM provides this operation directly. The AutoPas fallback is
  * retained for the original md-flexible unit tests and performs a local reduction only.
  */
 template <class Container, class Value, class Transform>
@@ -49,7 +49,7 @@ Value sumOwnedParticles(const Container &container, Value initialValue, Transfor
 /**
  * Execute a particle-local update on all owned particles.
  *
- * DistributedAutoPas owns the execution strategy in production. The AutoPas fallback
+ * AutoPasDM owns the execution strategy in production. The AutoPas fallback
  * exists only to keep the original local thermostat tests usable.
  */
 template <class Container, class Kernel>
@@ -71,7 +71,7 @@ Value globalSum(const Container &container, Value localValue) {
     return container.globalSum(localValue);
   } else {
     // Legacy AutoPas thermostat tests are local-only. Distributed communication is
-    // deliberately provided only by DistributedAutoPas.
+    // deliberately provided only by AutoPasDM.
     return localValue;
   }
 }
@@ -90,7 +90,7 @@ std::size_t globalNumberOfOwnedParticles(const Container &container) {
  * Calculates temperature of system.
  * Assuming dimension-less units and Boltzmann constant = 1.
  *
- * For DistributedAutoPas the returned temperature is global across all ranks.
+ * For AutoPasDM the returned temperature is global across all ranks.
  * The AutoPas fallback is intended for the original local md-flexible tests.
  *
  * @tparam Container Particle container type.

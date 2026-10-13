@@ -6,17 +6,17 @@
 
 #include "autopas/utils/ArrayMath.h"
 #include "autopas/utils/Math.h"
-#include "distributed_autopas/BoundaryType.h"
+#include "autopasdm/BoundaryType.h"
 
 /**
  * Application-level reflective Lennard-Jones wall used by md-flexible.
  *
- * DistributedAutoPas only models reflective boundaries as non-periodic
+ * AutoPasDM only models reflective boundaries as non-periodic
  * communication boundaries. The physical wall interaction remains part of the
  * simulator because it depends on Lennard-Jones particle properties.
  *
  * The current implementation covers md-flexible's single-site particle mode.
- * Only thin wall-adjacent regions are traversed through DistributedAutoPas.
+ * Only thin wall-adjacent regions are traversed through AutoPasDM.
  * It follows the original md-flexible model: a particle interacts with its own
  * mirror image across a reflective global boundary, but only while that
  * interaction is in the repulsive part of the Lennard-Jones potential.
@@ -108,7 +108,7 @@ void apply(Container &container, ParticlePropertiesLibrary &particlePropertiesLi
   };
 
   for (std::size_t dimension = 0; dimension < 3; ++dimension) {
-    if (boundaryTypes[dimension] != dap::BoundaryType::reflective) {
+    if (boundaryTypes[dimension] != autopasdm::BoundaryType::reflective) {
       continue;
     }
 

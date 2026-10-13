@@ -3,9 +3,9 @@
 #include <array>
 #include <vector>
 
-#include "distributed_autopas/BoundaryType.h"
+#include "autopasdm/BoundaryType.h"
 
-namespace dap {
+namespace autopasdm {
 
 /**
  * Cartesian regular-grid domain decomposition.
@@ -243,4 +243,4 @@ class DomainDecomposition {
   std::array<std::vector<double>, 3> _subdomainBoundaries{};
 };
 
-}  // namespace dap
+}  // namespace autopasdm

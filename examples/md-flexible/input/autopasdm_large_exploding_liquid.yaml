@@ -1,4 +1,4 @@
-# Large-scale 3D exploding-liquid slab for md-flexible + DistributedAutoPas.
+# Large-scale 3D exploding-liquid slab for md-flexible + AutoPasDM.
 #
 # Dense HCP slab:
 #   box-length [256, 48, 256], spacing 1.0
@@ -57,6 +57,6 @@ no-progress-bar                  : true
 log-level                        : info
 
 # Optional visualization. Enable only for selected runs.
-# vtk-filename                   : dapLargeExplodingLiquid
+# vtk-filename                   : autoPasDMLargeExplodingLiquid
 # vtk-write-frequency            : 1000
 # vtk-output-folder              : vtkOutputFolder

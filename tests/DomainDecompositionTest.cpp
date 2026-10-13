@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <vector>
 
-#include "distributed_autopas/DomainDecomposition.h"
+#include "autopasdm/DomainDecomposition.h"
 
 namespace {
 
@@ -16,7 +16,7 @@ TEST(DomainDecompositionTest, SplitsGlobalDomainAlongX) {
   constexpr double subdomainLength = 2.5;
 
   for (int rank = 0; rank < numRanks; ++rank) {
-    const dap::DomainDecomposition domain(rank, numRanks, globalMin, globalMax);
+    const autopasdm::DomainDecomposition domain(rank, numRanks, globalMin, globalMax);
 
     EXPECT_EQ(domain.rank(), rank);
     EXPECT_EQ(domain.numRanks(), numRanks);
@@ -35,23 +35,25 @@ TEST(DomainDecompositionTest, SplitsGlobalDomainAlongX) {
 }
 
 TEST(DomainDecompositionTest, GeneratesProcessGridFromSubdivisionMask) {
-  EXPECT_EQ(dap::DomainDecomposition::generateProcessGrid(4, {true, false, false}), (std::array<int, 3>{4, 1, 1}));
-  EXPECT_EQ(dap::DomainDecomposition::generateProcessGrid(4, {true, true, false}), (std::array<int, 3>{2, 2, 1}));
-  EXPECT_EQ(dap::DomainDecomposition::generateProcessGrid(8, {true, true, true}), (std::array<int, 3>{2, 2, 2}));
-  EXPECT_EQ(dap::DomainDecomposition::generateProcessGrid(12, {true, true, true}), (std::array<int, 3>{2, 2, 3}));
-  EXPECT_EQ(dap::DomainDecomposition::generateProcessGrid(6, {false, true, true}), (std::array<int, 3>{1, 2, 3}));
+  EXPECT_EQ(autopasdm::DomainDecomposition::generateProcessGrid(4, {true, false, false}),
+            (std::array<int, 3>{4, 1, 1}));
+  EXPECT_EQ(autopasdm::DomainDecomposition::generateProcessGrid(4, {true, true, false}), (std::array<int, 3>{2, 2, 1}));
+  EXPECT_EQ(autopasdm::DomainDecomposition::generateProcessGrid(8, {true, true, true}), (std::array<int, 3>{2, 2, 2}));
+  EXPECT_EQ(autopasdm::DomainDecomposition::generateProcessGrid(12, {true, true, true}), (std::array<int, 3>{2, 2, 3}));
+  EXPECT_EQ(autopasdm::DomainDecomposition::generateProcessGrid(6, {false, true, true}), (std::array<int, 3>{1, 2, 3}));
 }
 
 TEST(DomainDecompositionTest, RejectsInvalidRankAndGridInformation) {
-  EXPECT_THROW((dap::DomainDecomposition{0, 0, globalMin, globalMax}), std::invalid_argument);
-  EXPECT_THROW((dap::DomainDecomposition{-1, 4, globalMin, globalMax}), std::invalid_argument);
-  EXPECT_THROW((dap::DomainDecomposition{4, 4, globalMin, globalMax}), std::invalid_argument);
+  EXPECT_THROW((autopasdm::DomainDecomposition{0, 0, globalMin, globalMax}), std::invalid_argument);
+  EXPECT_THROW((autopasdm::DomainDecomposition{-1, 4, globalMin, globalMax}), std::invalid_argument);
+  EXPECT_THROW((autopasdm::DomainDecomposition{4, 4, globalMin, globalMax}), std::invalid_argument);
 
-  EXPECT_THROW((dap::DomainDecomposition{0, 4, globalMin, globalMax, std::array<int, 3>{2, 1, 1}}),
+  EXPECT_THROW((autopasdm::DomainDecomposition{0, 4, globalMin, globalMax, std::array<int, 3>{2, 1, 1}}),
                std::invalid_argument);
-  EXPECT_THROW((dap::DomainDecomposition{0, 4, globalMin, globalMax, std::array<int, 3>{2, 0, 2}}),
+  EXPECT_THROW((autopasdm::DomainDecomposition{0, 4, globalMin, globalMax, std::array<int, 3>{2, 0, 2}}),
                std::invalid_argument);
-  EXPECT_THROW((void)dap::DomainDecomposition::generateProcessGrid(4, {false, false, false}), std::invalid_argument);
+  EXPECT_THROW((void)autopasdm::DomainDecomposition::generateProcessGrid(4, {false, false, false}),
+               std::invalid_argument);
 }
 
 TEST(DomainDecompositionTest, SplitsGlobalDomainInThreeDimensions) {
@@ -59,7 +61,7 @@ TEST(DomainDecompositionTest, SplitsGlobalDomainInThreeDimensions) {
   constexpr std::array<double, 3> boxMax{8., 6., 4.};
   constexpr std::array<int, 3> processGrid{2, 3, 2};
 
-  const dap::DomainDecomposition domain(9, 12, boxMin, boxMax, processGrid);
+  const autopasdm::DomainDecomposition domain(9, 12, boxMin, boxMax, processGrid);
 
   EXPECT_EQ(domain.processGrid(), processGrid);
   EXPECT_EQ(domain.coordinates(), (std::array<int, 3>{1, 1, 1}));
@@ -69,7 +71,7 @@ TEST(DomainDecompositionTest, SplitsGlobalDomainInThreeDimensions) {
 
 TEST(DomainDecompositionTest, ConvertsBetweenRanksAndGridCoordinates) {
   constexpr std::array<int, 3> processGrid{2, 3, 2};
-  const dap::DomainDecomposition domain(0, 12, globalMin, globalMax, processGrid);
+  const autopasdm::DomainDecomposition domain(0, 12, globalMin, globalMax, processGrid);
 
   for (int rank = 0; rank < 12; ++rank) {
     EXPECT_EQ(domain.coordinatesToRank(domain.rankToCoordinates(rank)), rank);
@@ -85,7 +87,7 @@ TEST(DomainDecompositionTest, DeterminesTargetRankInThreeDimensions) {
   constexpr std::array<double, 3> boxMin{0., 0., 0.};
   constexpr std::array<double, 3> boxMax{8., 6., 4.};
   constexpr std::array<int, 3> processGrid{2, 3, 2};
-  const dap::DomainDecomposition domain(0, 12, boxMin, boxMax, processGrid);
+  const autopasdm::DomainDecomposition domain(0, 12, boxMin, boxMax, processGrid);
 
   EXPECT_EQ(domain.targetRank({0.1, 0.1, 0.1}), 0);
   EXPECT_EQ(domain.targetRank({3.999, 1.999, 1.999}), 0);
@@ -94,7 +96,7 @@ TEST(DomainDecompositionTest, DeterminesTargetRankInThreeDimensions) {
 }
 
 TEST(DomainDecompositionTest, DeterminesTargetRankFromAdaptiveSubdomainBoundaries) {
-  dap::DomainDecomposition domain(2, 4, globalMin, globalMax);
+  autopasdm::DomainDecomposition domain(2, 4, globalMin, globalMax);
 
   domain.setSubdomainBoundaries({
       std::vector<double>{0., 1.25, 4., 8.5, 10.},
@@ -116,7 +118,7 @@ TEST(DomainDecompositionTest, DeterminesTargetRankFromAdaptiveThreeDimensionalBo
   constexpr std::array<double, 3> boxMin{0., 0., 0.};
   constexpr std::array<double, 3> boxMax{8., 6., 4.};
   constexpr std::array<int, 3> processGrid{2, 3, 2};
-  dap::DomainDecomposition domain(0, 12, boxMin, boxMax, processGrid);
+  autopasdm::DomainDecomposition domain(0, 12, boxMin, boxMax, processGrid);
 
   domain.setSubdomainBoundaries({
       std::vector<double>{0., 1., 8.},
@@ -129,7 +131,7 @@ TEST(DomainDecompositionTest, DeterminesTargetRankFromAdaptiveThreeDimensionalBo
 }
 
 TEST(DomainDecompositionTest, RejectsInvalidSubdomainBoundaries) {
-  dap::DomainDecomposition domain(1, 4, globalMin, globalMax);
+  autopasdm::DomainDecomposition domain(1, 4, globalMin, globalMax);
 
   EXPECT_THROW(domain.setSubdomainBoundaries({
                    std::vector<double>{0., 2., 10.},
@@ -156,13 +158,13 @@ TEST(DomainDecompositionTest, FindsPeriodicFaceEdgeAndCornerNeighbors) {
   constexpr std::array<double, 3> boxMax{3., 3., 3.};
   constexpr std::array<int, 3> processGrid{3, 3, 3};
 
-  const dap::DomainDecomposition center(13, 27, boxMin, boxMax, processGrid);
+  const autopasdm::DomainDecomposition center(13, 27, boxMin, boxMax, processGrid);
   EXPECT_EQ(center.coordinates(), (std::array<int, 3>{1, 1, 1}));
   EXPECT_EQ(center.neighborRank({1, 0, 0}), 22);
   EXPECT_EQ(center.neighborRank({1, -1, 0}), 19);
   EXPECT_EQ(center.neighborRank({-1, 1, 1}), 8);
 
-  const dap::DomainDecomposition corner(0, 27, boxMin, boxMax, processGrid);
+  const autopasdm::DomainDecomposition corner(0, 27, boxMin, boxMax, processGrid);
   EXPECT_EQ(corner.neighborRank({-1, -1, -1}), 26);
   EXPECT_EQ(corner.precedingNeighbor(0), 18);
   EXPECT_EQ(corner.succeedingNeighbor(1), 3);
@@ -170,21 +172,21 @@ TEST(DomainDecompositionTest, FindsPeriodicFaceEdgeAndCornerNeighbors) {
 }
 
 TEST(DomainDecompositionTest, UsesPeriodicNeighbors) {
-  const dap::DomainDecomposition firstRank(0, 4, globalMin, globalMax);
+  const autopasdm::DomainDecomposition firstRank(0, 4, globalMin, globalMax);
   EXPECT_EQ(firstRank.leftNeighbor(), 3);
   EXPECT_EQ(firstRank.rightNeighbor(), 1);
 
-  const dap::DomainDecomposition middleRank(2, 4, globalMin, globalMax);
+  const autopasdm::DomainDecomposition middleRank(2, 4, globalMin, globalMax);
   EXPECT_EQ(middleRank.leftNeighbor(), 1);
   EXPECT_EQ(middleRank.rightNeighbor(), 3);
 
-  const dap::DomainDecomposition lastRank(3, 4, globalMin, globalMax);
+  const autopasdm::DomainDecomposition lastRank(3, 4, globalMin, globalMax);
   EXPECT_EQ(lastRank.leftNeighbor(), 2);
   EXPECT_EQ(lastRank.rightNeighbor(), 0);
 }
 
 TEST(DomainDecompositionTest, LocalDomainUsesHalfOpenBounds) {
-  const dap::DomainDecomposition domain(1, 4, globalMin, globalMax);
+  const autopasdm::DomainDecomposition domain(1, 4, globalMin, globalMax);
 
   EXPECT_TRUE(domain.isInsideLocalDomain({2.5, 1., 2.}));
   EXPECT_TRUE(domain.isInsideLocalDomain({4.999, 10.999, 11.999}));
@@ -196,7 +198,7 @@ TEST(DomainDecompositionTest, LocalDomainUsesHalfOpenBounds) {
 }
 
 TEST(DomainDecompositionTest, DetectsHaloRegionOutsideLocalDomain) {
-  const dap::DomainDecomposition domain(1, 4, globalMin, globalMax);
+  const autopasdm::DomainDecomposition domain(1, 4, globalMin, globalMax);
   constexpr double haloWidth = 0.5;
 
   EXPECT_TRUE(domain.isInsideHaloRegion({2.25, 5., 5.}, haloWidth));
@@ -213,7 +215,7 @@ TEST(DomainDecompositionTest, DetectsFaceEdgeAndCornerHaloRegionsInThreeDimensio
   constexpr std::array<double, 3> boxMin{0., 0., 0.};
   constexpr std::array<double, 3> boxMax{4., 4., 4.};
   constexpr std::array<int, 3> processGrid{2, 2, 2};
-  const dap::DomainDecomposition domain(0, 8, boxMin, boxMax, processGrid);
+  const autopasdm::DomainDecomposition domain(0, 8, boxMin, boxMax, processGrid);
   constexpr double haloWidth = 0.25;
 
   EXPECT_TRUE(domain.isInsideHaloRegion({2.1, 1., 1.}, haloWidth));
@@ -225,7 +227,7 @@ TEST(DomainDecompositionTest, DetectsFaceEdgeAndCornerHaloRegionsInThreeDimensio
 }
 
 TEST(DomainDecompositionTest, DeterminesTargetRankFromXPosition) {
-  const dap::DomainDecomposition domain(0, 4, globalMin, globalMax);
+  const autopasdm::DomainDecomposition domain(0, 4, globalMin, globalMax);
 
   EXPECT_EQ(domain.targetRank({0., 5., 5.}), 0);
   EXPECT_EQ(domain.targetRank({2.499, 5., 5.}), 0);
@@ -236,7 +238,7 @@ TEST(DomainDecompositionTest, DeterminesTargetRankFromXPosition) {
 }
 
 TEST(DomainDecompositionTest, AppliesPeriodicBoundaryInXOnly) {
-  const dap::DomainDecomposition domain(0, 4, globalMin, globalMax);
+  const autopasdm::DomainDecomposition domain(0, 4, globalMin, globalMax);
 
   std::array<double, 3> below{-20.25, 4., 7.};
   domain.applyPeriodicBoundary(below);
@@ -256,22 +258,24 @@ TEST(DomainDecompositionTest, AppliesPeriodicBoundaryInXOnly) {
 }
 
 TEST(DomainDecompositionTest, UsesNoneBoundaryWithoutPeriodicWraparoundNeighbor) {
-  constexpr std::array<dap::BoundaryType, 3> boundaries{dap::BoundaryType::periodic, dap::BoundaryType::none,
-                                                        dap::BoundaryType::none};
-  const dap::DomainDecomposition corner(0, 8, {0., 0., 0.}, {2., 2., 2.}, std::array<int, 3>{2, 2, 2}, boundaries);
+  constexpr std::array<autopasdm::BoundaryType, 3> boundaries{
+      autopasdm::BoundaryType::periodic, autopasdm::BoundaryType::none, autopasdm::BoundaryType::none};
+  const autopasdm::DomainDecomposition corner(0, 8, {0., 0., 0.}, {2., 2., 2.}, std::array<int, 3>{2, 2, 2},
+                                              boundaries);
 
   EXPECT_EQ(corner.precedingNeighbor(0), 4);
-  EXPECT_EQ(corner.precedingNeighbor(1), dap::DomainDecomposition::noNeighbor);
-  EXPECT_EQ(corner.precedingNeighbor(2), dap::DomainDecomposition::noNeighbor);
+  EXPECT_EQ(corner.precedingNeighbor(1), autopasdm::DomainDecomposition::noNeighbor);
+  EXPECT_EQ(corner.precedingNeighbor(2), autopasdm::DomainDecomposition::noNeighbor);
   EXPECT_EQ(corner.succeedingNeighbor(1), 2);
   EXPECT_EQ(corner.succeedingNeighbor(2), 1);
-  EXPECT_EQ(corner.neighborRank({-1, -1, 0}), dap::DomainDecomposition::noNeighbor);
+  EXPECT_EQ(corner.neighborRank({-1, -1, 0}), autopasdm::DomainDecomposition::noNeighbor);
 }
 
 TEST(DomainDecompositionTest, WrapsOnlyPeriodicDimensions) {
-  constexpr std::array<dap::BoundaryType, 3> boundaries{dap::BoundaryType::periodic, dap::BoundaryType::none,
-                                                        dap::BoundaryType::periodic};
-  const dap::DomainDecomposition domain(0, 1, {0., 0., 0.}, {2., 2., 2.}, std::array<int, 3>{1, 1, 1}, boundaries);
+  constexpr std::array<autopasdm::BoundaryType, 3> boundaries{
+      autopasdm::BoundaryType::periodic, autopasdm::BoundaryType::none, autopasdm::BoundaryType::periodic};
+  const autopasdm::DomainDecomposition domain(0, 1, {0., 0., 0.}, {2., 2., 2.}, std::array<int, 3>{1, 1, 1},
+                                              boundaries);
 
   std::array<double, 3> position{-0.25, -0.25, 2.25};
   domain.applyPeriodicBoundary(position);
@@ -282,14 +286,15 @@ TEST(DomainDecompositionTest, WrapsOnlyPeriodicDimensions) {
 }
 
 TEST(DomainDecompositionTest, TreatsReflectiveBoundaryAsNonPeriodicTopology) {
-  constexpr std::array<dap::BoundaryType, 3> boundaries{dap::BoundaryType::periodic, dap::BoundaryType::reflective,
-                                                        dap::BoundaryType::none};
-  const dap::DomainDecomposition domain(0, 8, {0., 0., 0.}, {2., 2., 2.}, std::array<int, 3>{2, 2, 2}, boundaries);
+  constexpr std::array<autopasdm::BoundaryType, 3> boundaries{
+      autopasdm::BoundaryType::periodic, autopasdm::BoundaryType::reflective, autopasdm::BoundaryType::none};
+  const autopasdm::DomainDecomposition domain(0, 8, {0., 0., 0.}, {2., 2., 2.}, std::array<int, 3>{2, 2, 2},
+                                              boundaries);
 
   EXPECT_EQ(domain.precedingNeighbor(0), 4);
-  EXPECT_EQ(domain.precedingNeighbor(1), dap::DomainDecomposition::noNeighbor);
+  EXPECT_EQ(domain.precedingNeighbor(1), autopasdm::DomainDecomposition::noNeighbor);
   EXPECT_EQ(domain.succeedingNeighbor(1), 2);
-  EXPECT_EQ(domain.boundaryType(1), dap::BoundaryType::reflective);
+  EXPECT_EQ(domain.boundaryType(1), autopasdm::BoundaryType::reflective);
 
   std::array<double, 3> position{0.5, -0.25, 0.5};
   domain.applyPeriodicBoundary(position);

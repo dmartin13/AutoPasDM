@@ -1,4 +1,4 @@
-# Adaptive 3D regression shared by original md-flexible and DistributedAutoPas.
+# Adaptive 3D regression shared by original md-flexible and AutoPasDM.
 #
 # Run both executables with 8 MPI ranks via scripts/run_load_balancing_regression.py.
 # The deliberately dense lower-octant block makes the initial 2 x 2 x 2 grid
@@ -36,7 +36,7 @@ subdivide-dimension: [true, true, true]
 load-balancer: InvertedPressure
 load-balancing-interval: 1
 
-vtk-filename: dapLoadBalancingCompare
+vtk-filename: autoPasDMLoadBalancingCompare
 vtk-output-folder: output
 vtk-write-frequency: 1
 no-progress-bar: true

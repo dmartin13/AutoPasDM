@@ -9,10 +9,10 @@
 #include <utility>
 #include <vector>
 
-#include "distributed_autopas/ParticleSerialization.h"
-#include "distributed_autopas/PerformanceCounters.h"
+#include "autopasdm/ParticleSerialization.h"
+#include "autopasdm/PerformanceCounters.h"
 
-namespace dap {
+namespace autopasdm {
 
 /**
  * Particles received from the two direct neighbors of one Cartesian dimension.
@@ -162,7 +162,7 @@ class LeftRightExchangeRequest {
   template <class P, class S>
   friend LeftRightExchangeRequest<P, S> beginLeftRightExchange(MPI_Comm, int, int, const std::vector<P> &,
                                                                const std::vector<P> &, int
-#ifdef DAP_ENABLE_DETAILED_TIMERS
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
                                                                ,
                                                                performance::PerformanceCounters *
 #endif
@@ -170,7 +170,7 @@ class LeftRightExchangeRequest {
 
   template <class P, class S>
   friend LeftRightExchange<P> finishLeftRightExchange(LeftRightExchangeRequest<P, S> &
-#ifdef DAP_ENABLE_DETAILED_TIMERS
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
                                                       ,
                                                       performance::PerformanceCounters *
 #endif
@@ -205,7 +205,7 @@ template <class Particle, class Serializer = ParticleSerializer<Particle>>
 LeftRightExchangeRequest<Particle, Serializer> beginLeftRightExchange(
     MPI_Comm comm, int left, int right, const std::vector<Particle> &sendLeft, const std::vector<Particle> &sendRight,
     int tag
-#ifdef DAP_ENABLE_DETAILED_TIMERS
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
     ,
     performance::PerformanceCounters *performanceCounters = nullptr
 #endif
@@ -214,10 +214,10 @@ LeftRightExchangeRequest<Particle, Serializer> beginLeftRightExchange(
   static_assert(std::is_trivially_copyable_v<Message>,
                 "ParticleSerializer::Message must be trivially copyable for MPI_BYTE communication.");
 
-  DAP_DETAILED_TIMER_START(performanceCounters, communicationPack);
+  AUTOPASDM_DETAILED_TIMER_START(performanceCounters, communicationPack);
   auto sendLeftMessages = detail::packParticles<Particle, Serializer>(sendLeft);
   auto sendRightMessages = detail::packParticles<Particle, Serializer>(sendRight);
-  DAP_DETAILED_TIMER_STOP(performanceCounters, communicationPack);
+  AUTOPASDM_DETAILED_TIMER_STOP(performanceCounters, communicationPack);
 
   const int sendLeftCount = static_cast<int>(sendLeftMessages.size());
   const int sendRightCount = static_cast<int>(sendRightMessages.size());
@@ -234,19 +234,19 @@ LeftRightExchangeRequest<Particle, Serializer> beginLeftRightExchange(
   // The count handshake is tiny but must finish before receive payload buffers can
   // be allocated. The potentially large particle payload is what remains in flight
   // after beginLeftRightExchange() returns.
-  DAP_DETAILED_TIMER_START(performanceCounters, communicationCountExchange);
+  AUTOPASDM_DETAILED_TIMER_START(performanceCounters, communicationCountExchange);
   std::array<MPI_Request, 4> countRequests{};
   MPI_Irecv(&recvFromRightCount, 1, MPI_INT, mpiRight, tag, comm, &countRequests[0]);
   MPI_Irecv(&recvFromLeftCount, 1, MPI_INT, mpiLeft, tag + 1, comm, &countRequests[1]);
   MPI_Isend(&sendLeftCount, 1, MPI_INT, mpiLeft, tag, comm, &countRequests[2]);
   MPI_Isend(&sendRightCount, 1, MPI_INT, mpiRight, tag + 1, comm, &countRequests[3]);
   MPI_Waitall(static_cast<int>(countRequests.size()), countRequests.data(), MPI_STATUSES_IGNORE);
-  DAP_DETAILED_TIMER_STOP(performanceCounters, communicationCountExchange);
+  AUTOPASDM_DETAILED_TIMER_STOP(performanceCounters, communicationCountExchange);
 
-  DAP_DETAILED_ADD(performanceCounters, communicationBytesSent,
-                   static_cast<std::uint64_t>(sendLeftCount + sendRightCount) * sizeof(Message));
-  DAP_DETAILED_ADD(performanceCounters, communicationBytesReceived,
-                   static_cast<std::uint64_t>(recvFromLeftCount + recvFromRightCount) * sizeof(Message));
+  AUTOPASDM_DETAILED_ADD(performanceCounters, communicationBytesSent,
+                         static_cast<std::uint64_t>(sendLeftCount + sendRightCount) * sizeof(Message));
+  AUTOPASDM_DETAILED_ADD(performanceCounters, communicationBytesReceived,
+                         static_cast<std::uint64_t>(recvFromLeftCount + recvFromRightCount) * sizeof(Message));
 
   std::vector<Message> recvFromLeftMessages(recvFromLeftCount);
   std::vector<Message> recvFromRightMessages(recvFromRightCount);
@@ -278,7 +278,7 @@ LeftRightExchangeRequest<Particle, Serializer> beginLeftRightExchange(
  */
 template <class Particle, class Serializer = ParticleSerializer<Particle>>
 LeftRightExchange<Particle> finishLeftRightExchange(LeftRightExchangeRequest<Particle, Serializer> &request
-#ifdef DAP_ENABLE_DETAILED_TIMERS
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
                                                     ,
                                                     performance::PerformanceCounters *performanceCounters = nullptr
 #endif
@@ -287,14 +287,14 @@ LeftRightExchange<Particle> finishLeftRightExchange(LeftRightExchangeRequest<Par
     throw std::logic_error("finishLeftRightExchange(): request has already been completed.");
   }
 
-  DAP_DETAILED_TIMER_START(performanceCounters, communicationPayloadWait);
+  AUTOPASDM_DETAILED_TIMER_START(performanceCounters, communicationPayloadWait);
   request.waitForCompletion();
-  DAP_DETAILED_TIMER_STOP(performanceCounters, communicationPayloadWait);
+  AUTOPASDM_DETAILED_TIMER_STOP(performanceCounters, communicationPayloadWait);
 
-  DAP_DETAILED_TIMER_START(performanceCounters, communicationUnpack);
+  AUTOPASDM_DETAILED_TIMER_START(performanceCounters, communicationUnpack);
   auto recvFromLeft = detail::unpackParticles<Particle, Serializer>(request._recvFromLeftMessages);
   auto recvFromRight = detail::unpackParticles<Particle, Serializer>(request._recvFromRightMessages);
-  DAP_DETAILED_TIMER_STOP(performanceCounters, communicationUnpack);
+  AUTOPASDM_DETAILED_TIMER_STOP(performanceCounters, communicationUnpack);
 
   return LeftRightExchange<Particle>{std::move(recvFromLeft), std::move(recvFromRight)};
 }
@@ -429,4 +429,4 @@ std::vector<Particle> exchangeParticlesByRank(MPI_Comm comm,
   return receivedParticles;
 }
 
-}  // namespace dap
+}  // namespace autopasdm

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace dap {
+namespace autopasdm {
 
 /**
  * Boundary condition applied at the global simulation-box boundary.
@@ -16,4 +16,4 @@ enum class BoundaryType {
   none
 };
 
-}  // namespace dap
+}  // namespace autopasdm

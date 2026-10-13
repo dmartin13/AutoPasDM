@@ -1,4 +1,4 @@
-# Static performance baseline shared by original md-flexible and DistributedAutoPas.
+# Static performance baseline shared by original md-flexible and AutoPasDM.
 #
 # The AutoPas search space is deliberately fixed to avoid tuning noise. Load balancing
 # is disabled here so that the first benchmark isolates the cost of the distributed

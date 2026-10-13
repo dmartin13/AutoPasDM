@@ -1,4 +1,4 @@
-# Thermostat correctness test for DistributedAutoPas + md-flexible.
+# Thermostat correctness test for AutoPasDM + md-flexible.
 #
 # Purpose:
 # - deterministic initial velocities (no Brownian motion)
@@ -40,7 +40,7 @@ thermostat:
   thermostatInterval: 1
   addBrownianMotion: false
 
-vtk-filename: dapThermostatCompare
+vtk-filename: autoPasDMThermostatCompare
 vtk-write-frequency: 1
 no-progress-bar: true
 no-end-config: true

@@ -1,7 +1,7 @@
-# Larger static strong-scaling case shared by original md-flexible and DistributedAutoPas.
+# Larger static strong-scaling case shared by original md-flexible and AutoPasDM.
 #
 # This keeps the same density and fixed AutoPas configuration as
-# dap_performance_baseline.yaml, but increases the global system from 16^3 = 4096
+# autopasdm_performance_baseline.yaml, but increases the global system from 16^3 = 4096
 # to 32^3 = 32768 particles. Load balancing remains disabled so the benchmark
 # isolates the distributed synchronization path.
 

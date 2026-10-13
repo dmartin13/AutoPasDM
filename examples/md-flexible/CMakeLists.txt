@@ -1,12 +1,12 @@
-# md-flexible adapted as a bundled DistributedAutoPas example.
-# AutoPas and DistributedAutoPas are configured by the repository root.
+# md-flexible adapted as a bundled AutoPasDM example.
+# AutoPas and AutoPasDM are configured by the repository root.
 
 list(APPEND CMAKE_MODULE_PATH "${AUTOPAS_SOURCE_DIR}/cmake/modules")
 
 include(autopas_yaml-cpp)
 include(autopas_all)
 
-option(MD_FLEXIBLE_USE_MPI "Enable MPI support for the DistributedAutoPas md-flexible example." ON)
+option(MD_FLEXIBLE_USE_MPI "Enable MPI support for the AutoPasDM md-flexible example." ON)
 option(MD_FLEXIBLE_FUNCTOR_AUTOVEC "Compile AutoVec Functor." ON)
 option(MD_FLEXIBLE_FUNCTOR_AVX "If instruction set is available, compile AVX Functor." OFF)
 option(MD_FLEXIBLE_FUNCTOR_SVE "If instruction set is available, compile SVE Functor." OFF)
@@ -27,7 +27,7 @@ target_link_libraries(
     md-flexible
     PUBLIC
         autopas
-        distributed_autopas
+        autopasdm
         generators
         molecularDynamicsLibrary
         yaml-cpp
@@ -68,12 +68,12 @@ foreach(aux_file ${MDFLEX_AUX_FILES})
 endforeach()
 
 # Small integration example: md-flexible's MoleculeLJ + md-flexible's ordinary
-# AutoPas LJFunctor running through DistributedAutoPas. No functor adapter.
-add_executable(distributed-lj-example examples/DistributedLJExample.cpp)
-target_include_directories(distributed-lj-example PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+# AutoPas LJFunctor running through AutoPasDM. No functor adapter.
+add_executable(autopasdm-lj-example examples/AutoPasDMLJExample.cpp)
+target_include_directories(autopasdm-lj-example PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(
-    distributed-lj-example
+    autopasdm-lj-example
     PRIVATE
-        distributed_autopas
+        autopasdm
         molecularDynamicsLibrary
 )

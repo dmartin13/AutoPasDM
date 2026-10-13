@@ -14,8 +14,8 @@
 #include "GlobalVariableLogger.h"
 #include "TimeDiscretization.h"
 #include "autopas/AutoPasDecl.h"
-#include "distributed_autopas/DistributedAutoPas.h"
-#include "distributed_autopas/Runtime.h"
+#include "autopasdm/AutoPasDM.h"
+#include "autopasdm/Runtime.h"
 #include "src/ParallelVtkWriter.h"
 #include "src/TypeDefinitions.h"
 #include "src/configuration/MDFlexConfig.h"
@@ -30,9 +30,9 @@ class Simulation {
   /**
    * Initializes the simulation on a domain according to the arguments passed to the main function.
    * @param configuration: The configuration of this simulation.
-   * @param runtime DistributedAutoPas runtime used by the distributed particle container.
+   * @param runtime AutoPasDM runtime used by the distributed particle container.
    */
-  Simulation(const MDFlexConfig &configuration, dap::Runtime &runtime);
+  Simulation(const MDFlexConfig &configuration, autopasdm::Runtime &runtime);
 
   /**
    * Destructor.
@@ -87,8 +87,8 @@ class Simulation {
    * thermostat operations, and output. The simulator never accesses the node-local
    * AutoPas container directly.
    */
-  using DistributedContainerType = dap::DistributedAutoPas<ParticleType>;
-  std::shared_ptr<DistributedContainerType> _distributedAutoPasContainer;
+  using DistributedContainerType = autopasdm::AutoPasDM<ParticleType>;
+  std::shared_ptr<DistributedContainerType> _autoPasDMContainer;
 
   /**
    * Shared pointer to the logfile.
@@ -257,11 +257,11 @@ class Simulation {
     autopas::utils::Timer updateContainer;
 
     /**
-     * Records the complete DistributedAutoPas synchronization phase.
+     * Records the complete AutoPasDM synchronization phase.
      *
      * This includes the node-local container update, optional load balancing,
      * particle migration, and halo exchange. It is intentionally aggregated
-     * because these operations are encapsulated by DistributedAutoPas.
+     * because these operations are encapsulated by AutoPasDM.
      */
     autopas::utils::Timer distributedSynchronization;
   };
@@ -283,7 +283,7 @@ class Simulation {
 
  private:
   /**
-   * Load and redistribute particles from this object's config through DistributedAutoPas.
+   * Load and redistribute particles from this object's config through AutoPasDM.
    *
    * @note This also clears all particles from the config file!
    */
@@ -344,7 +344,7 @@ class Simulation {
   void updateAngularVelocities();
 
   /**
-   * Updates the global thermostat through DistributedAutoPas reductions.
+   * Updates the global thermostat through AutoPasDM reductions.
    */
   void updateThermostat();
 

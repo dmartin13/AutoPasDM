@@ -5,13 +5,13 @@
 
 #include "MoleculeLJSerializer.h"
 #include "autopas/baseFunctors/Functor.h"
-#include "distributed_autopas/DistributedAutoPas.h"
-#include "distributed_autopas/Runtime.h"
+#include "autopasdm/AutoPasDM.h"
+#include "autopasdm/Runtime.h"
 #include "molecularDynamicsLibrary/LJFunctor.h"
 #include "molecularDynamicsLibrary/MoleculeLJ.h"
 
 int main(int argc, char **argv) {
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
 
   using Particle = mdLib::MoleculeLJ;
   constexpr double cutoff = 2.5;
@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
   const std::array<double, 3> boxMin{0.0, 0.0, 0.0};
   const std::array<double, 3> boxMax{8.0, 8.0, 8.0};
 
-  dap::DistributedAutoPas<Particle> particles(runtime, boxMin, boxMax, cutoff, std::array<bool, 3>{true, true, true});
+  autopasdm::AutoPasDM<Particle> particles(runtime, boxMin, boxMax, cutoff, std::array<bool, 3>{true, true, true});
 
   std::vector<Particle> initialParticles;
   if (particles.isRoot()) {

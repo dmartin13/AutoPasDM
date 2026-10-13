@@ -2,18 +2,18 @@
 
 #include <cstdint>
 
-#if defined(DAP_ENABLE_DETAILED_TIMERS) && !defined(DAP_ENABLE_TIMERS)
-#define DAP_ENABLE_TIMERS
+#if defined(AUTOPASDM_ENABLE_DETAILED_TIMERS) && !defined(AUTOPASDM_ENABLE_TIMERS)
+#define AUTOPASDM_ENABLE_TIMERS
 #endif
 
-#ifdef DAP_ENABLE_TIMERS
+#ifdef AUTOPASDM_ENABLE_TIMERS
 #include <autopas/utils/Timer.h>
 #endif
 
-namespace dap::performance {
+namespace autopasdm::performance {
 
 /**
- * Snapshot of the local DistributedAutoPas performance counters.
+ * Snapshot of the local AutoPasDM performance counters.
  *
  * Timer values are accumulated nanoseconds on the calling MPI rank. Counter
  * values are local counts and can be reduced by the application after the
@@ -49,7 +49,7 @@ struct PerformanceCountersSnapshot {
   std::uint64_t communicationBytesReceived{};
 };
 
-#ifdef DAP_ENABLE_TIMERS
+#ifdef AUTOPASDM_ENABLE_TIMERS
 
 /**
  * RAII helper for exception-safe scoped timing with autopas::utils::Timer.
@@ -84,7 +84,7 @@ class ScopedTimer {
 };
 
 /**
- * Optional timer and counter storage shared by one DistributedAutoPas instance.
+ * Optional timer and counter storage shared by one AutoPasDM instance.
  */
 struct PerformanceCounters {
   autopas::utils::Timer synchronization;
@@ -98,7 +98,7 @@ struct PerformanceCounters {
   autopas::utils::Timer haloExchange;
   autopas::utils::Timer addHaloParticles;
 
-#ifdef DAP_ENABLE_DETAILED_TIMERS
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
   autopas::utils::Timer migrationClassification;
   autopas::utils::Timer haloInitialCopy;
   autopas::utils::Timer haloSelection;
@@ -131,7 +131,7 @@ struct PerformanceCounters {
     result.haloExchangeNs = static_cast<std::uint64_t>(haloExchange.getTotalTime());
     result.addHaloParticlesNs = static_cast<std::uint64_t>(addHaloParticles.getTotalTime());
 
-#ifdef DAP_ENABLE_DETAILED_TIMERS
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
     result.migrationClassificationNs = static_cast<std::uint64_t>(migrationClassification.getTotalTime());
     result.haloInitialCopyNs = static_cast<std::uint64_t>(haloInitialCopy.getTotalTime());
     result.haloSelectionNs = static_cast<std::uint64_t>(haloSelection.getTotalTime());
@@ -166,7 +166,7 @@ struct PerformanceCounters {
     haloExchange.reset();
     addHaloParticles.reset();
 
-#ifdef DAP_ENABLE_DETAILED_TIMERS
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
     migrationClassification.reset();
     haloInitialCopy.reset();
     haloSelection.reset();
@@ -193,7 +193,7 @@ struct PerformanceCounters {
  * Empty performance-counter storage used by production builds.
  *
  * All timing and counting expressions are removed by the preprocessor. The
- * object is marked [[no_unique_address]] by DistributedAutoPas, so it does not
+ * object is marked [[no_unique_address]] by AutoPasDM, so it does not
  * add storage to the container either.
  */
 struct PerformanceCounters {
@@ -206,50 +206,50 @@ struct PerformanceCounters {
 
 #endif
 
-}  // namespace dap::performance
+}  // namespace autopasdm::performance
 
-#define DAP_DETAIL_CONCAT_IMPL(left, right) left##right
-#define DAP_DETAIL_CONCAT(left, right) DAP_DETAIL_CONCAT_IMPL(left, right)
+#define AUTOPASDM_DETAIL_CONCAT_IMPL(left, right) left##right
+#define AUTOPASDM_DETAIL_CONCAT(left, right) AUTOPASDM_DETAIL_CONCAT_IMPL(left, right)
 
-#ifdef DAP_ENABLE_TIMERS
-#define DAP_TIMER_START(timer) (timer).start()
-#define DAP_TIMER_STOP(timer) (timer).stop()
-#define DAP_SCOPED_TIMER(timer) \
-  ::dap::performance::ScopedTimer DAP_DETAIL_CONCAT(_dapScopedTimer_, __LINE__) { &(timer) }
+#ifdef AUTOPASDM_ENABLE_TIMERS
+#define AUTOPASDM_TIMER_START(timer) (timer).start()
+#define AUTOPASDM_TIMER_STOP(timer) (timer).stop()
+#define AUTOPASDM_SCOPED_TIMER(timer) \
+  ::autopasdm::performance::ScopedTimer AUTOPASDM_DETAIL_CONCAT(_autopasdmScopedTimer_, __LINE__) { &(timer) }
 #else
-#define DAP_TIMER_START(timer)
-#define DAP_TIMER_STOP(timer)
-#define DAP_SCOPED_TIMER(timer)
+#define AUTOPASDM_TIMER_START(timer)
+#define AUTOPASDM_TIMER_STOP(timer)
+#define AUTOPASDM_SCOPED_TIMER(timer)
 #endif
 
-#ifdef DAP_ENABLE_DETAILED_TIMERS
-#define DAP_DETAILED_TIMER_START(performanceCountersPointer, timerMember) \
-  do {                                                                    \
-    if ((performanceCountersPointer) != nullptr) {                        \
-      (performanceCountersPointer)->timerMember.start();                  \
-    }                                                                     \
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
+#define AUTOPASDM_DETAILED_TIMER_START(performanceCountersPointer, timerMember) \
+  do {                                                                          \
+    if ((performanceCountersPointer) != nullptr) {                              \
+      (performanceCountersPointer)->timerMember.start();                        \
+    }                                                                           \
   } while (false)
-#define DAP_DETAILED_TIMER_STOP(performanceCountersPointer, timerMember) \
-  do {                                                                   \
-    if ((performanceCountersPointer) != nullptr) {                       \
-      (performanceCountersPointer)->timerMember.stop();                  \
-    }                                                                    \
+#define AUTOPASDM_DETAILED_TIMER_STOP(performanceCountersPointer, timerMember) \
+  do {                                                                         \
+    if ((performanceCountersPointer) != nullptr) {                             \
+      (performanceCountersPointer)->timerMember.stop();                        \
+    }                                                                          \
   } while (false)
-#define DAP_DETAILED_SCOPED_TIMER(performanceCountersPointer, timerMember)                         \
-  ::dap::performance::ScopedTimer DAP_DETAIL_CONCAT(_dapDetailedScopedTimer_, __LINE__) {          \
-    (performanceCountersPointer) != nullptr ? &(performanceCountersPointer)->timerMember : nullptr \
+#define AUTOPASDM_DETAILED_SCOPED_TIMER(performanceCountersPointer, timerMember)                            \
+  ::autopasdm::performance::ScopedTimer AUTOPASDM_DETAIL_CONCAT(_autopasdmDetailedScopedTimer_, __LINE__) { \
+    (performanceCountersPointer) != nullptr ? &(performanceCountersPointer)->timerMember : nullptr          \
   }
-#define DAP_DETAILED_COUNTERS_ARGUMENT(value) , value
-#define DAP_DETAILED_ADD(performanceCountersPointer, counterMember, value)              \
+#define AUTOPASDM_DETAILED_COUNTERS_ARGUMENT(value) , value
+#define AUTOPASDM_DETAILED_ADD(performanceCountersPointer, counterMember, value)        \
   do {                                                                                  \
     if ((performanceCountersPointer) != nullptr) {                                      \
       (performanceCountersPointer)->counterMember += static_cast<std::uint64_t>(value); \
     }                                                                                   \
   } while (false)
 #else
-#define DAP_DETAILED_COUNTERS_ARGUMENT(value)
-#define DAP_DETAILED_TIMER_START(performanceCountersPointer, timerMember)
-#define DAP_DETAILED_TIMER_STOP(performanceCountersPointer, timerMember)
-#define DAP_DETAILED_SCOPED_TIMER(performanceCountersPointer, timerMember)
-#define DAP_DETAILED_ADD(performanceCountersPointer, counterMember, value)
+#define AUTOPASDM_DETAILED_COUNTERS_ARGUMENT(value)
+#define AUTOPASDM_DETAILED_TIMER_START(performanceCountersPointer, timerMember)
+#define AUTOPASDM_DETAILED_TIMER_STOP(performanceCountersPointer, timerMember)
+#define AUTOPASDM_DETAILED_SCOPED_TIMER(performanceCountersPointer, timerMember)
+#define AUTOPASDM_DETAILED_ADD(performanceCountersPointer, counterMember, value)
 #endif

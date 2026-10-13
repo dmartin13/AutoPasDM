@@ -1,4 +1,4 @@
-#include "distributed_autopas/DomainDecomposition.h"
+#include "autopasdm/DomainDecomposition.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-namespace dap {
+namespace autopasdm {
 namespace {
 constexpr std::array<BoundaryType, 3> periodicBoundaries{BoundaryType::periodic, BoundaryType::periodic,
                                                          BoundaryType::periodic};
@@ -47,28 +47,28 @@ DomainDecomposition::DomainDecomposition(int rank, int numRanks, std::array<doub
       _globalMin(globalMin),
       _globalMax(globalMax) {
   if (_numRanks <= 0) {
-    throw std::invalid_argument("DistributedAutoPas: number of ranks must be positive.");
+    throw std::invalid_argument("AutoPasDM: number of ranks must be positive.");
   }
 
   if (_rank < 0 or _rank >= _numRanks) {
-    throw std::invalid_argument("DistributedAutoPas: rank is outside the valid range.");
+    throw std::invalid_argument("AutoPasDM: rank is outside the valid range.");
   }
 
   long long gridSize = 1;
   for (std::size_t dimension = 0; dimension < 3; ++dimension) {
     if (_processGrid[dimension] <= 0) {
-      throw std::invalid_argument("DistributedAutoPas: process-grid dimensions must be positive.");
+      throw std::invalid_argument("AutoPasDM: process-grid dimensions must be positive.");
     }
 
     if (_globalMax[dimension] <= _globalMin[dimension]) {
-      throw std::invalid_argument("DistributedAutoPas: global box must have positive extent in every dimension.");
+      throw std::invalid_argument("AutoPasDM: global box must have positive extent in every dimension.");
     }
 
     gridSize *= _processGrid[dimension];
   }
 
   if (gridSize != _numRanks) {
-    throw std::invalid_argument("DistributedAutoPas: process-grid size must equal the number of ranks.");
+    throw std::invalid_argument("AutoPasDM: process-grid size must equal the number of ranks.");
   }
 
   _coordinates = rankToCoordinates(_rank);
@@ -93,14 +93,14 @@ DomainDecomposition::DomainDecomposition(int rank, int numRanks, std::array<doub
 std::array<int, 3> DomainDecomposition::generateProcessGrid(int numRanks,
                                                             const std::array<bool, 3> &subdivideDimensions) {
   if (numRanks <= 0) {
-    throw std::invalid_argument("DistributedAutoPas: number of ranks must be positive.");
+    throw std::invalid_argument("AutoPasDM: number of ranks must be positive.");
   }
 
   const auto dimensionsToSubdivide =
       static_cast<std::size_t>(std::count(subdivideDimensions.begin(), subdivideDimensions.end(), true));
 
   if (numRanks > 1 and dimensionsToSubdivide == 0) {
-    throw std::invalid_argument("DistributedAutoPas: at least one dimension must be subdivided for multiple ranks.");
+    throw std::invalid_argument("AutoPasDM: at least one dimension must be subdivided for multiple ranks.");
   }
 
   std::vector<int> factors;
@@ -144,7 +144,7 @@ void DomainDecomposition::applyPeriodicBoundary(std::array<double, 3> &pos) cons
 
 void DomainDecomposition::applyPeriodicBoundary(std::array<double, 3> &pos, int dimension) const {
   if (dimension < 0 or dimension >= 3) {
-    throw std::invalid_argument("DistributedAutoPas: boundary dimension must be 0, 1, or 2.");
+    throw std::invalid_argument("AutoPasDM: boundary dimension must be 0, 1, or 2.");
   }
 
   if (_boundaryTypes[dimension] != BoundaryType::periodic) {
@@ -206,18 +206,17 @@ void DomainDecomposition::setSubdomainBoundaries(std::array<std::vector<double>,
   for (std::size_t dimension = 0; dimension < 3; ++dimension) {
     const auto expectedSize = static_cast<std::size_t>(_processGrid[dimension] + 1);
     if (boundaries[dimension].size() != expectedSize) {
-      throw std::invalid_argument(
-          "DistributedAutoPas: number of subdomain boundaries must match the process-grid dimension.");
+      throw std::invalid_argument("AutoPasDM: number of subdomain boundaries must match the process-grid dimension.");
     }
 
     if (boundaries[dimension].front() != _globalMin[dimension] or
         boundaries[dimension].back() != _globalMax[dimension]) {
-      throw std::invalid_argument("DistributedAutoPas: subdomain boundaries must span the complete global box.");
+      throw std::invalid_argument("AutoPasDM: subdomain boundaries must span the complete global box.");
     }
 
     for (std::size_t boundary = 1; boundary < boundaries[dimension].size(); ++boundary) {
       if (boundaries[dimension][boundary] <= boundaries[dimension][boundary - 1]) {
-        throw std::invalid_argument("DistributedAutoPas: subdomain boundaries must be strictly increasing.");
+        throw std::invalid_argument("AutoPasDM: subdomain boundaries must be strictly increasing.");
       }
     }
   }
@@ -231,7 +230,7 @@ void DomainDecomposition::setSubdomainBoundaries(std::array<std::vector<double>,
 
 std::array<int, 3> DomainDecomposition::rankToCoordinates(int rank) const {
   if (rank < 0 or rank >= _numRanks) {
-    throw std::invalid_argument("DistributedAutoPas: rank is outside the valid range.");
+    throw std::invalid_argument("AutoPasDM: rank is outside the valid range.");
   }
 
   std::array<int, 3> coordinates{};
@@ -249,7 +248,7 @@ std::array<int, 3> DomainDecomposition::rankToCoordinates(int rank) const {
 int DomainDecomposition::coordinatesToRank(const std::array<int, 3> &coordinates) const {
   for (std::size_t dimension = 0; dimension < 3; ++dimension) {
     if (coordinates[dimension] < 0 or coordinates[dimension] >= _processGrid[dimension]) {
-      throw std::invalid_argument("DistributedAutoPas: process-grid coordinates are outside the valid range.");
+      throw std::invalid_argument("AutoPasDM: process-grid coordinates are outside the valid range.");
     }
   }
 
@@ -279,7 +278,7 @@ int DomainDecomposition::neighborRank(const std::array<int, 3> &offset) const {
 
 int DomainDecomposition::precedingNeighbor(int dimension) const {
   if (dimension < 0 or dimension >= 3) {
-    throw std::invalid_argument("DistributedAutoPas: neighbor dimension must be 0, 1, or 2.");
+    throw std::invalid_argument("AutoPasDM: neighbor dimension must be 0, 1, or 2.");
   }
 
   std::array<int, 3> offset{};
@@ -289,7 +288,7 @@ int DomainDecomposition::precedingNeighbor(int dimension) const {
 
 int DomainDecomposition::succeedingNeighbor(int dimension) const {
   if (dimension < 0 or dimension >= 3) {
-    throw std::invalid_argument("DistributedAutoPas: neighbor dimension must be 0, 1, or 2.");
+    throw std::invalid_argument("AutoPasDM: neighbor dimension must be 0, 1, or 2.");
   }
 
   std::array<int, 3> offset{};
@@ -313,7 +312,7 @@ const std::array<BoundaryType, 3> &DomainDecomposition::boundaryTypes() const { 
 
 BoundaryType DomainDecomposition::boundaryType(int dimension) const {
   if (dimension < 0 or dimension >= 3) {
-    throw std::invalid_argument("DistributedAutoPas: boundary dimension must be 0, 1, or 2.");
+    throw std::invalid_argument("AutoPasDM: boundary dimension must be 0, 1, or 2.");
   }
   return _boundaryTypes[static_cast<std::size_t>(dimension)];
 }
@@ -326,4 +325,4 @@ const std::array<double, 3> &DomainDecomposition::localMin() const { return _loc
 
 const std::array<double, 3> &DomainDecomposition::localMax() const { return _localMax; }
 
-}  // namespace dap
+}  // namespace autopasdm

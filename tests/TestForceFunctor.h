@@ -8,10 +8,10 @@
 
 #include "autopas/baseFunctors/PairwiseFunctor.h"
 
-namespace dap::testing {
+namespace autopasdm::testing {
 
 /**
- * Small deterministic AoS-only force functor for DistributedAutoPas tests.
+ * Small deterministic AoS-only force functor for AutoPasDM tests.
  *
  * For every pair within the cutoff, particle A receives (r_B - r_A) and,
  * with Newton3 enabled, particle B receives the opposite force. Using a
@@ -81,4 +81,4 @@ class TestForceFunctor : public autopas::PairwiseFunctor<Particle, TestForceFunc
   double _cutoffSquared;
 };
 
-}  // namespace dap::testing
+}  // namespace autopasdm::testing

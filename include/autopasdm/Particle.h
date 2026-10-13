@@ -3,15 +3,15 @@
 #include <array>
 
 #include "autopas/particles/ParticleDefinitions.h"
-#include "distributed_autopas/ParticleSerialization.h"
+#include "autopasdm/ParticleSerialization.h"
 
-namespace dap {
+namespace autopasdm {
 
 /**
  * Particle type used by the minimal example.
  *
- * DistributedAutoPas itself is no longer tied to this type. Applications can instantiate
- * DistributedAutoPas with their own AutoPas-compatible particle type.
+ * AutoPasDM itself is no longer tied to this type. Applications can instantiate
+ * AutoPasDM with their own AutoPas-compatible particle type.
  */
 using Particle = autopas::ParticleBaseFP64;
 
@@ -48,4 +48,4 @@ struct ParticleSerializer<Particle> {
   }
 };
 
-}  // namespace dap
+}  // namespace autopasdm

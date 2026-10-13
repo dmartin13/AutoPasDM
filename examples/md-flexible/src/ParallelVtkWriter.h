@@ -12,8 +12,8 @@
 #include <unordered_set>
 
 #include "autopas/tuning/Configuration.h"
-#include "distributed_autopas/DistributedAutoPas.h"
-#include "distributed_autopas/Runtime.h"
+#include "autopasdm/AutoPasDM.h"
+#include "autopasdm/Runtime.h"
 #include "src/TypeDefinitions.h"
 #include "src/distributed/MoleculeLJParticleSerializer.h"
 
@@ -22,16 +22,16 @@
  */
 class ParallelVtkWriter {
  public:
-  using DistributedContainerType = dap::DistributedAutoPas<ParticleType>;
+  using DistributedContainerType = autopasdm::AutoPasDM<ParticleType>;
   /**
    * Constructor.
    * @param sessionName Sets the prefix for every created folder / file.
    * @param outputFolder Sets the folder where the vtk files will be created.
    * @param maximumNumberOfDigitsInIteration The maximum number of digits an iteration index can have.
-   * @param runtime DistributedAutoPas runtime used for rank information and collective coordination.
+   * @param runtime AutoPasDM runtime used for rank information and collective coordination.
    */
   ParallelVtkWriter(std::string sessionName, const std::string &outputFolder,
-                    const int &maximumNumberOfDigitsInIteration, dap::Runtime &runtime);
+                    const int &maximumNumberOfDigitsInIteration, autopasdm::Runtime &runtime);
 
   /**
    * Destructor.

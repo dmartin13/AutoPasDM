@@ -4,16 +4,16 @@
 #include <cstddef>
 
 #include "autopas/AutoPasDecl.h"
-#include "distributed_autopas/ParticleSerialization.h"
+#include "autopasdm/ParticleSerialization.h"
 #include "molecularDynamicsLibrary/MoleculeLJ.h"
 
-namespace dap {
+namespace autopasdm {
 
 /**
  * MPI serialization for md-flexible's single-site particle type.
  *
  * The application defines which particle state has to be transferred. This
- * keeps DistributedAutoPas independent of md-flexible and of MoleculeLJ.
+ * keeps AutoPasDM independent of md-flexible and of MoleculeLJ.
  */
 template <>
 struct ParticleSerializer<mdLib::MoleculeLJ> {
@@ -55,4 +55,4 @@ struct ParticleSerializer<mdLib::MoleculeLJ> {
   }
 };
 
-}  // namespace dap
+}  // namespace autopasdm

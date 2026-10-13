@@ -1,9 +1,9 @@
 #pragma once
 
-namespace dap {
+namespace autopasdm {
 
 /**
- * Serialization customization point for particles communicated by DistributedAutoPas.
+ * Serialization customization point for particles communicated by AutoPasDM.
  *
  * Applications using a custom particle type have to specialize this template and provide:
  *
@@ -19,4 +19,4 @@ namespace dap {
 template <class Particle>
 struct ParticleSerializer;
 
-}  // namespace dap
+}  // namespace autopasdm

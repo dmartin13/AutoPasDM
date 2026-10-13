@@ -13,17 +13,17 @@
 #include "autopas/AutoPas.h"
 #include "autopas/options/IteratorBehavior.h"
 #include "autopas/utils/WrapOpenMP.h"
-#include "distributed_autopas/BoundaryType.h"
-#include "distributed_autopas/Communication.h"
-#include "distributed_autopas/DomainDecomposition.h"
-#include "distributed_autopas/HaloExchange.h"
-#include "distributed_autopas/ParticleMigration.h"
-#include "distributed_autopas/ParticleSerialization.h"
-#include "distributed_autopas/PerformanceCounters.h"
-#include "distributed_autopas/Runtime.h"
-#include "distributed_autopas/load_balancing/InvertedPressureLoadBalancer.h"
+#include "autopasdm/BoundaryType.h"
+#include "autopasdm/Communication.h"
+#include "autopasdm/DomainDecomposition.h"
+#include "autopasdm/HaloExchange.h"
+#include "autopasdm/ParticleMigration.h"
+#include "autopasdm/ParticleSerialization.h"
+#include "autopasdm/PerformanceCounters.h"
+#include "autopasdm/Runtime.h"
+#include "autopasdm/load_balancing/InvertedPressureLoadBalancer.h"
 
-namespace dap {
+namespace autopasdm {
 
 /**
  * Distributed particle container built around a node-local AutoPas instance.
@@ -31,13 +31,13 @@ namespace dap {
  * The public interface is intentionally expressed in terms of operations on a
  * distributed particle system rather than in terms of MPI or local AutoPas
  * iterators. The simulator describes what should happen to owned particles and
- * DistributedAutoPas decides how the local storage and communication are handled.
+ * AutoPasDM decides how the local storage and communication are handled.
  *
  * @tparam Particle AutoPas-compatible particle type stored in the distributed container.
  * @tparam Serializer Serialization policy used to communicate the particle type.
  */
 template <class Particle, class Serializer = ParticleSerializer<Particle>>
-class DistributedAutoPas {
+class AutoPasDM {
  public:
   /**
    * Construct a distributed container with the legacy one-dimensional x decomposition.
@@ -49,11 +49,10 @@ class DistributedAutoPas {
    * @param globalMax Upper corner of the global simulation box.
    * @param cutoff Interaction cutoff used to size the halo region.
    */
-  DistributedAutoPas(Runtime &runtime, const std::array<double, 3> &globalMin, const std::array<double, 3> &globalMax,
-                     double cutoff)
-      : DistributedAutoPas(
-            runtime, globalMin, globalMax, cutoff, std::array<bool, 3>{true, false, false},
-            std::array<BoundaryType, 3>{BoundaryType::periodic, BoundaryType::none, BoundaryType::none}) {}
+  AutoPasDM(Runtime &runtime, const std::array<double, 3> &globalMin, const std::array<double, 3> &globalMax,
+            double cutoff)
+      : AutoPasDM(runtime, globalMin, globalMax, cutoff, std::array<bool, 3>{true, false, false},
+                  std::array<BoundaryType, 3>{BoundaryType::periodic, BoundaryType::none, BoundaryType::none}) {}
 
   /**
    * Construct a distributed container with an automatically generated Cartesian process grid.
@@ -66,11 +65,11 @@ class DistributedAutoPas {
    * @param cutoff Interaction cutoff used to size the halo region.
    * @param subdivideDimensions Selects which Cartesian dimensions may be subdivided.
    */
-  DistributedAutoPas(Runtime &runtime, const std::array<double, 3> &globalMin, const std::array<double, 3> &globalMax,
-                     double cutoff, const std::array<bool, 3> &subdivideDimensions)
-      : DistributedAutoPas(
-            runtime, globalMin, globalMax, cutoff, subdivideDimensions,
-            std::array<BoundaryType, 3>{BoundaryType::periodic, BoundaryType::periodic, BoundaryType::periodic}) {}
+  AutoPasDM(Runtime &runtime, const std::array<double, 3> &globalMin, const std::array<double, 3> &globalMax,
+            double cutoff, const std::array<bool, 3> &subdivideDimensions)
+      : AutoPasDM(runtime, globalMin, globalMax, cutoff, subdivideDimensions,
+                  std::array<BoundaryType, 3>{BoundaryType::periodic, BoundaryType::periodic, BoundaryType::periodic}) {
+  }
 
   /**
    * Construct a distributed container with an automatically generated Cartesian process grid and explicit boundaries.
@@ -82,10 +81,10 @@ class DistributedAutoPas {
    * @param subdivideDimensions Selects which Cartesian dimensions may be subdivided.
    * @param boundaryTypes Boundary condition applied at the global boundary of each dimension.
    */
-  DistributedAutoPas(Runtime &runtime, const std::array<double, 3> &globalMin, const std::array<double, 3> &globalMax,
-                     double cutoff, const std::array<bool, 3> &subdivideDimensions,
-                     const std::array<BoundaryType, 3> &boundaryTypes)
-      : DistributedAutoPas(runtime, globalMin, globalMax, cutoff, subdivideDimensions, boundaryTypes, [](auto &) {}) {}
+  AutoPasDM(Runtime &runtime, const std::array<double, 3> &globalMin, const std::array<double, 3> &globalMax,
+            double cutoff, const std::array<bool, 3> &subdivideDimensions,
+            const std::array<BoundaryType, 3> &boundaryTypes)
+      : AutoPasDM(runtime, globalMin, globalMax, cutoff, subdivideDimensions, boundaryTypes, [](auto &) {}) {}
 
   /**
    * Construct and configure the node-local AutoPas instance before initialization.
@@ -102,11 +101,11 @@ class DistributedAutoPas {
    */
   template <class Configurator>
   requires std::invocable < Configurator, autopas::AutoPas<Particle>
-  & > DistributedAutoPas(Runtime &runtime, const std::array<double, 3> &globalMin,
-                         const std::array<double, 3> &globalMax, double cutoff, Configurator &&configurator)
-      : DistributedAutoPas(runtime, globalMin, globalMax, cutoff, std::array<bool, 3>{true, false, false},
-                           std::array<BoundaryType, 3>{BoundaryType::periodic, BoundaryType::none, BoundaryType::none},
-                           std::forward<Configurator>(configurator)) {}
+  & > AutoPasDM(Runtime &runtime, const std::array<double, 3> &globalMin, const std::array<double, 3> &globalMax,
+                double cutoff, Configurator &&configurator)
+      : AutoPasDM(runtime, globalMin, globalMax, cutoff, std::array<bool, 3>{true, false, false},
+                  std::array<BoundaryType, 3>{BoundaryType::periodic, BoundaryType::none, BoundaryType::none},
+                  std::forward<Configurator>(configurator)) {}
 
   /**
    * Construct and configure a distributed container with an automatically generated Cartesian process grid.
@@ -124,13 +123,11 @@ class DistributedAutoPas {
    */
   template <class Configurator>
   requires std::invocable < Configurator, autopas::AutoPas<Particle>
-  & > DistributedAutoPas(Runtime &runtime, const std::array<double, 3> &globalMin,
-                         const std::array<double, 3> &globalMax, double cutoff,
-                         const std::array<bool, 3> &subdivideDimensions, Configurator &&configurator)
-      : DistributedAutoPas(
-            runtime, globalMin, globalMax, cutoff, subdivideDimensions,
-            std::array<BoundaryType, 3>{BoundaryType::periodic, BoundaryType::periodic, BoundaryType::periodic},
-            std::forward<Configurator>(configurator)) {}
+  & > AutoPasDM(Runtime &runtime, const std::array<double, 3> &globalMin, const std::array<double, 3> &globalMax,
+                double cutoff, const std::array<bool, 3> &subdivideDimensions, Configurator &&configurator)
+      : AutoPasDM(runtime, globalMin, globalMax, cutoff, subdivideDimensions,
+                  std::array<BoundaryType, 3>{BoundaryType::periodic, BoundaryType::periodic, BoundaryType::periodic},
+                  std::forward<Configurator>(configurator)) {}
 
   /**
    * Construct and configure a distributed container with a Cartesian process grid
@@ -139,7 +136,7 @@ class DistributedAutoPas {
    * periodic, reflective, and none are accepted as distributed boundary topology.
    * Reflective boundaries are non-periodic for migration and halo exchange. The
    * physical wall force itself is intentionally application-defined and is not
-   * applied by DistributedAutoPas. The configurator is invoked after box and cutoff setup and before AutoPas::init().
+   * applied by AutoPasDM. The configurator is invoked after box and cutoff setup and before AutoPas::init().
    *
    * @tparam Configurator Callable accepting a reference to the node-local AutoPas instance.
    * @param runtime Process runtime used for distributed communication.
@@ -152,14 +149,13 @@ class DistributedAutoPas {
    */
   template <class Configurator>
   requires std::invocable < Configurator, autopas::AutoPas<Particle>
-  & > DistributedAutoPas(Runtime &runtime, const std::array<double, 3> &globalMin,
-                         const std::array<double, 3> &globalMax, double cutoff,
-                         const std::array<bool, 3> &subdivideDimensions,
-                         const std::array<BoundaryType, 3> &boundaryTypes, Configurator &&configurator)
+  & > AutoPasDM(Runtime &runtime, const std::array<double, 3> &globalMin, const std::array<double, 3> &globalMax,
+                double cutoff, const std::array<bool, 3> &subdivideDimensions,
+                const std::array<BoundaryType, 3> &boundaryTypes, Configurator &&configurator)
       : _runtime(runtime),
   _domain(runtime.rank(), runtime.size(), globalMin, globalMax, subdivideDimensions, boundaryTypes),
-  _particleMigration(runtime.communicator() DAP_DETAILED_COUNTERS_ARGUMENT(&_performanceCounters)),
-  _haloExchange(runtime.communicator() DAP_DETAILED_COUNTERS_ARGUMENT(&_performanceCounters)), _cutoff(cutoff) {
+  _particleMigration(runtime.communicator() AUTOPASDM_DETAILED_COUNTERS_ARGUMENT(&_performanceCounters)),
+  _haloExchange(runtime.communicator() AUTOPASDM_DETAILED_COUNTERS_ARGUMENT(&_performanceCounters)), _cutoff(cutoff) {
     _autoPas.setBoxMin(_domain.localMin());
     _autoPas.setBoxMax(_domain.localMax());
     _autoPas.setCutoff(_cutoff);
@@ -193,7 +189,7 @@ class DistributedAutoPas {
   template <class Collection>
   void addParticlesFromRoot(const Collection &particles, int rootRank = 0) {
     if (rootRank < 0 or rootRank >= _domain.numRanks()) {
-      throw std::runtime_error("DistributedAutoPas: invalid root rank for particle insertion.");
+      throw std::runtime_error("AutoPasDM: invalid root rank for particle insertion.");
     }
 
     if (_runtime.rank() == rootRank) {
@@ -281,7 +277,7 @@ class DistributedAutoPas {
 
     for (std::size_t dimension = 0; dimension < 3; ++dimension) {
       if (regionMin[dimension] > regionMax[dimension]) {
-        throw std::invalid_argument("DistributedAutoPas: region minimum must not exceed region maximum.");
+        throw std::invalid_argument("AutoPasDM: region minimum must not exceed region maximum.");
       }
 
       clippedMin[dimension] = std::max(regionMin[dimension], _domain.localMin()[dimension]);
@@ -430,16 +426,16 @@ class DistributedAutoPas {
     return globalSum(getLocalNumberOfOwnedParticles());
   }
 
-  /** Get the rank in the DistributedAutoPas runtime. */
+  /** Get the rank in the AutoPasDM runtime. */
   [[nodiscard]] int rank() const { return _runtime.rank(); }
 
-  /** Get the total number of ranks in the DistributedAutoPas runtime. */
+  /** Get the total number of ranks in the AutoPasDM runtime. */
   [[nodiscard]] int numberOfRanks() const { return _runtime.size(); }
 
   /** Check whether this process is rank zero. */
   [[nodiscard]] bool isRoot() const { return _runtime.isRoot(); }
 
-  /** Synchronize all ranks in the DistributedAutoPas runtime. */
+  /** Synchronize all ranks in the AutoPasDM runtime. */
   void barrier() const { _runtime.barrier(); }
 
   /**
@@ -491,15 +487,15 @@ class DistributedAutoPas {
   [[nodiscard]] auto getCurrentLocalConfigurations() const { return _autoPas.getCurrentConfigs(); }
 
   /**
-   * Get a local snapshot of the optional DistributedAutoPas performance counters.
+   * Get a local snapshot of the optional AutoPasDM performance counters.
    *
-   * All values are zero when the library was built without DISTRIBUTED_AUTOPAS_ENABLE_TIMERS.
+   * All values are zero when the library was built without AUTOPASDM_ENABLE_TIMERS.
    */
   [[nodiscard]] performance::PerformanceCountersSnapshot getPerformanceCountersSnapshot() const {
     return _performanceCounters.snapshot();
   }
 
-  /** Reset all locally accumulated DistributedAutoPas performance counter values. */
+  /** Reset all locally accumulated AutoPasDM performance counter values. */
   void resetPerformanceCounters() { _performanceCounters.reset(); }
 
   /** Finalize the node-local AutoPas instance before the communication runtime is destroyed. */
@@ -510,10 +506,10 @@ class DistributedAutoPas {
    * Update the node-local container, migrate emigrants, and rebuild halo particles without changing the domain bounds.
    */
   void synchronizeParticles() {
-    DAP_SCOPED_TIMER(_performanceCounters.synchronization);
-    DAP_TIMER_START(_performanceCounters.updateContainer);
+    AUTOPASDM_SCOPED_TIMER(_performanceCounters.synchronization);
+    AUTOPASDM_TIMER_START(_performanceCounters.updateContainer);
     auto emigrants = _autoPas.updateContainer();
-    DAP_TIMER_STOP(_performanceCounters.updateContainer);
+    AUTOPASDM_TIMER_STOP(_performanceCounters.updateContainer);
     migrateAndExchangeHalos(std::move(emigrants));
   }
 
@@ -524,10 +520,10 @@ class DistributedAutoPas {
    * @param localMax Proposed upper corner of this rank's ownership box.
    */
   void synchronizeParticles(const std::array<double, 3> &localMin, const std::array<double, 3> &localMax) {
-    DAP_SCOPED_TIMER(_performanceCounters.synchronization);
-    DAP_TIMER_START(_performanceCounters.updateContainer);
+    AUTOPASDM_SCOPED_TIMER(_performanceCounters.synchronization);
+    AUTOPASDM_TIMER_START(_performanceCounters.updateContainer);
     auto emigrants = _autoPas.updateContainer();
-    DAP_TIMER_STOP(_performanceCounters.updateContainer);
+    AUTOPASDM_TIMER_STOP(_performanceCounters.updateContainer);
     resizeDomainAndMigrate(std::move(emigrants), localMin, localMax);
   }
 
@@ -537,10 +533,10 @@ class DistributedAutoPas {
    * @param localWork Computational work measured on this rank.
    */
   void synchronizeParticlesWithLoadBalancing(double localWork) {
-    DAP_SCOPED_TIMER(_performanceCounters.synchronization);
-    DAP_TIMER_START(_performanceCounters.updateContainer);
+    AUTOPASDM_SCOPED_TIMER(_performanceCounters.synchronization);
+    AUTOPASDM_TIMER_START(_performanceCounters.updateContainer);
     auto emigrants = _autoPas.updateContainer();
-    DAP_TIMER_STOP(_performanceCounters.updateContainer);
+    AUTOPASDM_TIMER_STOP(_performanceCounters.updateContainer);
 
     // There is no distributed geometry to balance with a single rank. Avoid creating
     // unnecessary plane communicators and keep the ordinary synchronization path.
@@ -549,14 +545,14 @@ class DistributedAutoPas {
       return;
     }
 
-    DAP_TIMER_START(_performanceCounters.loadBalancing);
+    AUTOPASDM_TIMER_START(_performanceCounters.loadBalancing);
     if (not _invertedPressureLoadBalancer.has_value()) {
       _invertedPressureLoadBalancer.emplace(_runtime.communicator(), _domain);
     }
 
     const double minWidth = 2. * (_cutoff + _autoPas.getVerletSkin());
     const auto balancedBox = _invertedPressureLoadBalancer->balance(localWork, _domain, minWidth);
-    DAP_TIMER_STOP(_performanceCounters.loadBalancing);
+    AUTOPASDM_TIMER_STOP(_performanceCounters.loadBalancing);
     resizeDomainAndMigrate(std::move(emigrants), balancedBox.min, balancedBox.max);
   }
 
@@ -572,13 +568,13 @@ class DistributedAutoPas {
     // Synchronize the complete Cartesian split positions before changing AutoPas.
     // targetRank() needs all process-plane boundaries once the grid is no longer uniform.
     auto resizedDomain = _domain;
-    DAP_TIMER_START(_performanceCounters.boundarySynchronization);
+    AUTOPASDM_TIMER_START(_performanceCounters.boundarySynchronization);
     resizedDomain.setSubdomainBoundaries(collectSubdomainBoundaries(localMin, localMax));
-    DAP_TIMER_STOP(_performanceCounters.boundarySynchronization);
+    AUTOPASDM_TIMER_STOP(_performanceCounters.boundarySynchronization);
 
-    DAP_TIMER_START(_performanceCounters.resizeBox);
+    AUTOPASDM_TIMER_START(_performanceCounters.resizeBox);
     auto additionalEmigrants = _autoPas.resizeBox(resizedDomain.localMin(), resizedDomain.localMax());
-    DAP_TIMER_STOP(_performanceCounters.resizeBox);
+    AUTOPASDM_TIMER_STOP(_performanceCounters.resizeBox);
     emigrants.reserve(emigrants.size() + additionalEmigrants.size());
     emigrants.insert(emigrants.end(), std::make_move_iterator(additionalEmigrants.begin()),
                      std::make_move_iterator(additionalEmigrants.end()));
@@ -603,7 +599,7 @@ class DistributedAutoPas {
 
     if (MPI_Allgather(localBounds.data(), static_cast<int>(localBounds.size()), MPI_DOUBLE, gatheredBounds.data(),
                       static_cast<int>(localBounds.size()), MPI_DOUBLE, _runtime.communicator()) != MPI_SUCCESS) {
-      throw std::runtime_error("DistributedAutoPas: failed to synchronize adaptive subdomain boundaries.");
+      throw std::runtime_error("AutoPasDM: failed to synchronize adaptive subdomain boundaries.");
     }
 
     std::array<std::vector<double>, 3> boundaries;
@@ -616,8 +612,7 @@ class DistributedAutoPas {
 
     const auto setBoundary = [&](std::size_t dimension, std::size_t boundaryIndex, double value) {
       if (initialized[dimension][boundaryIndex] and boundaries[dimension][boundaryIndex] != value) {
-        throw std::runtime_error(
-            "DistributedAutoPas: neighboring ranks proposed inconsistent adaptive subdomain boundaries.");
+        throw std::runtime_error("AutoPasDM: neighboring ranks proposed inconsistent adaptive subdomain boundaries.");
       }
       boundaries[dimension][boundaryIndex] = value;
       initialized[dimension][boundaryIndex] = true;
@@ -644,30 +639,30 @@ class DistributedAutoPas {
    * @param emigrants Particles that no longer belong to the local ownership box.
    */
   void migrateAndExchangeHalos(std::vector<Particle> emigrants) {
-    DAP_TIMER_START(_performanceCounters.migration);
+    AUTOPASDM_TIMER_START(_performanceCounters.migration);
     auto immigrants = _particleMigration.migrate(emigrants, _domain);
-    DAP_TIMER_STOP(_performanceCounters.migration);
+    AUTOPASDM_TIMER_STOP(_performanceCounters.migration);
 
-    DAP_TIMER_START(_performanceCounters.addMigratedParticles);
+    AUTOPASDM_TIMER_START(_performanceCounters.addMigratedParticles);
     _autoPas.addParticles(immigrants);
-    DAP_TIMER_STOP(_performanceCounters.addMigratedParticles);
+    AUTOPASDM_TIMER_STOP(_performanceCounters.addMigratedParticles);
 
-    DAP_TIMER_START(_performanceCounters.ownedParticleCollection);
+    AUTOPASDM_TIMER_START(_performanceCounters.ownedParticleCollection);
     std::vector<Particle> ownedParticles;
     ownedParticles.reserve(getLocalNumberOfOwnedParticles());
 
     for (auto iter = _autoPas.begin(autopas::IteratorBehavior::owned); iter.isValid(); ++iter) {
       ownedParticles.push_back(*iter);
     }
-    DAP_TIMER_STOP(_performanceCounters.ownedParticleCollection);
+    AUTOPASDM_TIMER_STOP(_performanceCounters.ownedParticleCollection);
 
-    DAP_TIMER_START(_performanceCounters.haloExchange);
+    AUTOPASDM_TIMER_START(_performanceCounters.haloExchange);
     auto haloParticles = _haloExchange.exchange(ownedParticles, _domain, _cutoff);
-    DAP_TIMER_STOP(_performanceCounters.haloExchange);
+    AUTOPASDM_TIMER_STOP(_performanceCounters.haloExchange);
 
-    DAP_TIMER_START(_performanceCounters.addHaloParticles);
+    AUTOPASDM_TIMER_START(_performanceCounters.addHaloParticles);
     _autoPas.addHaloParticles(haloParticles);
-    DAP_TIMER_STOP(_performanceCounters.addHaloParticles);
+    AUTOPASDM_TIMER_STOP(_performanceCounters.addHaloParticles);
   }
 
   Runtime &_runtime;
@@ -680,4 +675,4 @@ class DistributedAutoPas {
   double _cutoff;
 };
 
-}  // namespace dap
+}  // namespace autopasdm

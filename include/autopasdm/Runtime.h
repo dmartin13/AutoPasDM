@@ -6,10 +6,10 @@
 #include <string>
 #include <type_traits>
 
-namespace dap {
+namespace autopasdm {
 
 template <class Particle, class Serializer>
-class DistributedAutoPas;
+class AutoPasDM;
 
 namespace detail {
 template <class>
@@ -45,16 +45,16 @@ MPI_Datatype mpiDatatype() {
       static_assert(alwaysFalse<T>, "Unsupported std::size_t representation for MPI reduction.");
     }
   } else {
-    static_assert(alwaysFalse<T>, "Unsupported type for DistributedAutoPas reduction.");
+    static_assert(alwaysFalse<T>, "Unsupported type for AutoPasDM reduction.");
   }
 }
 }  // namespace detail
 
 /**
- * Process runtime used by DistributedAutoPas.
+ * Process runtime used by AutoPasDM.
  *
  * The application creates exactly one Runtime object. Runtime owns the communication
- * backend lifetime when it initialized it itself and provides DistributedAutoPas with
+ * backend lifetime when it initialized it itself and provides AutoPasDM with
  * a private communication context. Application code therefore does not have to call
  * MPI_Init, MPI_Finalize, MPI_Comm_rank, or MPI_Comm_size directly.
  *
@@ -84,10 +84,10 @@ class Runtime {
    */
   ~Runtime();
 
-  /** Get the rank in the private DistributedAutoPas communication context. */
+  /** Get the rank in the private AutoPasDM communication context. */
   [[nodiscard]] int rank() const;
 
-  /** Get the number of ranks in the private DistributedAutoPas communication context. */
+  /** Get the number of ranks in the private AutoPasDM communication context. */
   [[nodiscard]] int size() const;
 
   /** Check whether this process is rank zero. */
@@ -106,12 +106,12 @@ class Runtime {
 
  private:
   template <class Particle, class Serializer>
-  friend class DistributedAutoPas;
+  friend class AutoPasDM;
 
-  /** Get the private MPI communicator used internally by DistributedAutoPas. */
+  /** Get the private MPI communicator used internally by AutoPasDM. */
   [[nodiscard]] MPI_Comm communicator() const;
 
-  /** Synchronize all ranks in the private DistributedAutoPas communication context. */
+  /** Synchronize all ranks in the private AutoPasDM communication context. */
   void barrier() const;
 
   /**
@@ -133,4 +133,4 @@ class Runtime {
   bool _ownsBackendLifetime{false};
 };
 
-}  // namespace dap
+}  // namespace autopasdm

@@ -1,5 +1,5 @@
 # Large-scale 3D spinodal-decomposition / phase-separation scenario
-# for md-flexible + DistributedAutoPas.
+# for md-flexible + AutoPasDM.
 #
 # Default size:
 #   192^3 = 7,077,888 particles
@@ -71,6 +71,6 @@ no-progress-bar                  : false
 log-level                        : info
 
 # Optional visualization. Enable only for selected runs.
-vtk-filename                   : dapLargeSpinodal
+vtk-filename                   : autoPasDMLargeSpinodal
 vtk-write-frequency            : 1000
 vtk-output-folder              : vtkOutputFolder

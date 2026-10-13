@@ -1,9 +1,9 @@
-#include "distributed_autopas/Runtime.h"
+#include "autopasdm/Runtime.h"
 
 #include <stdexcept>
 #include <string>
 
-namespace dap {
+namespace autopasdm {
 
 Runtime::Runtime(int &argc, char **&argv) {
   int initialized = 0;
@@ -13,10 +13,10 @@ Runtime::Runtime(int &argc, char **&argv) {
     _ownsBackendLifetime = true;
   }
 
-  // Give DistributedAutoPas its own communication context. This prevents its
+  // Give AutoPasDM its own communication context. This prevents its
   // messages from colliding with communication performed by another library.
   if (MPI_Comm_dup(MPI_COMM_WORLD, &_communicator) != MPI_SUCCESS) {
-    throw std::runtime_error("DistributedAutoPas: failed to create communication context.");
+    throw std::runtime_error("AutoPasDM: failed to create communication context.");
   }
 
   MPI_Comm_rank(_communicator, &_rank);
@@ -62,4 +62,4 @@ MPI_Comm Runtime::communicator() const { return _communicator; }
 
 void Runtime::barrier() const { MPI_Barrier(_communicator); }
 
-}  // namespace dap
+}  // namespace autopasdm

@@ -8,12 +8,12 @@
 #include <utility>
 #include <vector>
 
-#include "distributed_autopas/Communication.h"
-#include "distributed_autopas/DomainDecomposition.h"
-#include "distributed_autopas/ParticleSerialization.h"
-#include "distributed_autopas/PerformanceCounters.h"
+#include "autopasdm/Communication.h"
+#include "autopasdm/DomainDecomposition.h"
+#include "autopasdm/ParticleSerialization.h"
+#include "autopasdm/PerformanceCounters.h"
 
-namespace dap {
+namespace autopasdm {
 
 /**
  * Migrate particles between direct neighbors of a Cartesian process grid.
@@ -45,7 +45,7 @@ class ParticleMigration {
     }
   }
 
-#ifdef DAP_ENABLE_DETAILED_TIMERS
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
   /**
    * Construct a particle migrator that records detailed performance counters.
    *
@@ -77,7 +77,7 @@ class ParticleMigration {
 
     for (std::size_t dimension = 0; dimension < 3; ++dimension) {
       const auto boundaryType = domain.boundaryType(static_cast<int>(dimension));
-      DAP_DETAILED_TIMER_START(_performanceCounters, migrationClassification);
+      AUTOPASDM_DETAILED_TIMER_START(_performanceCounters, migrationClassification);
 
       if (domain.processGrid()[dimension] == 1) {
         std::vector<Particle> particlesInsideBoundary;
@@ -101,7 +101,7 @@ class ParticleMigration {
         }
 
         remainingParticles = std::move(particlesInsideBoundary);
-        DAP_DETAILED_TIMER_STOP(_performanceCounters, migrationClassification);
+        AUTOPASDM_DETAILED_TIMER_STOP(_performanceCounters, migrationClassification);
         continue;
       }
 
@@ -155,17 +155,18 @@ class ParticleMigration {
         }
       }
 
-      DAP_DETAILED_TIMER_STOP(_performanceCounters, migrationClassification);
-      DAP_DETAILED_ADD(_performanceCounters, migrationParticlesSent, sendPreceding.size() + sendSucceeding.size());
+      AUTOPASDM_DETAILED_TIMER_STOP(_performanceCounters, migrationClassification);
+      AUTOPASDM_DETAILED_ADD(_performanceCounters, migrationParticlesSent,
+                             sendPreceding.size() + sendSucceeding.size());
 
       auto exchangeRequest = beginLeftRightExchange<Particle, Serializer>(
           _comm, domain.precedingNeighbor(static_cast<int>(dimension)),
           domain.succeedingNeighbor(static_cast<int>(dimension)), sendPreceding, sendSucceeding,
-          100 + static_cast<int>(dimension) * 10 DAP_DETAILED_COUNTERS_ARGUMENT(_performanceCounters));
+          100 + static_cast<int>(dimension) * 10 AUTOPASDM_DETAILED_COUNTERS_ARGUMENT(_performanceCounters));
       const auto exchange =
-          finishLeftRightExchange(exchangeRequest DAP_DETAILED_COUNTERS_ARGUMENT(_performanceCounters));
-      DAP_DETAILED_ADD(_performanceCounters, migrationParticlesReceived,
-                       exchange.recvFromLeft.size() + exchange.recvFromRight.size());
+          finishLeftRightExchange(exchangeRequest AUTOPASDM_DETAILED_COUNTERS_ARGUMENT(_performanceCounters));
+      AUTOPASDM_DETAILED_ADD(_performanceCounters, migrationParticlesReceived,
+                             exchange.recvFromLeft.size() + exchange.recvFromRight.size());
 
       stayForNextDimension.reserve(stayForNextDimension.size() + exchange.recvFromLeft.size() +
                                    exchange.recvFromRight.size());
@@ -222,9 +223,9 @@ class ParticleMigration {
 
   MPI_Comm _comm{MPI_COMM_WORLD};
   int _numberOfRanks{1};
-#ifdef DAP_ENABLE_DETAILED_TIMERS
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
   performance::PerformanceCounters *_performanceCounters{nullptr};
 #endif
 };
 
-}  // namespace dap
+}  // namespace autopasdm

@@ -2,14 +2,14 @@
 
 #include <string>
 
-#include "distributed_autopas/Runtime.h"
+#include "autopasdm/Runtime.h"
 
 namespace {
 
 TEST(RuntimeTest, ReportsRankSizeAndRoot) {
   int argc = 0;
   char **argv = nullptr;
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
 
   EXPECT_EQ(runtime.size(), 4);
   EXPECT_GE(runtime.rank(), 0);
@@ -20,7 +20,7 @@ TEST(RuntimeTest, ReportsRankSizeAndRoot) {
 TEST(RuntimeTest, BroadcastsStringFromNonzeroRoot) {
   int argc = 0;
   char **argv = nullptr;
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
 
   EXPECT_EQ(runtime.size(), 4);
 

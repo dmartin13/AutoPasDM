@@ -1,4 +1,4 @@
-# DistributedAutoPas Architecture
+# AutoPasDM Architecture
 
 ## Responsibility split
 
@@ -9,7 +9,7 @@ Simulator / md-flexible
         |
         | particle operations and AutoPas interaction functors
         v
-DistributedAutoPas
+AutoPasDM
         |
         +-- distributed ownership / domain decomposition
         +-- migration
@@ -22,7 +22,7 @@ DistributedAutoPas
 
 The simulator is executed once per process/rank, but it should not contain MPI,
 NCCL, NVSHMEM, or other communication-backend calls. It describes the physical
-model and invokes operations on the distributed particle system. DistributedAutoPas
+model and invokes operations on the distributed particle system. AutoPasDM
 owns the distributed algorithms, while AutoPas remains responsible for node-level
 particle storage, traversal, and tuning.
 
@@ -56,8 +56,8 @@ prepare-and-compute case.
 
 The public API intentionally provides no direct access to the node-level AutoPas
 container. Diagnostics and output consume particle traversal and local tuning
-metadata through dedicated DistributedAutoPas operations. Spatially restricted
-application kernels use `applyToOwnedParticlesInRegion()`. DistributedAutoPas clips
+metadata through dedicated AutoPasDM operations. Spatially restricted
+application kernels use `applyToOwnedParticlesInRegion()`. AutoPasDM clips
 the requested region to the rank-local ownership box and delegates the traversal to
 AutoPas without exposing its region iterator to the application.
 
@@ -86,7 +86,7 @@ Particle insertion distinguishes between replicated and already distributed inpu
 Replicated configuration input uses `addParticlesFromRoot()`, so only one logical copy
 is routed to owners. Checkpoint pieces that are already distributed across processes
 use `addDistributedParticles()`, where every process contributes its local input
-collection. In both cases, DistributedAutoPas determines rank ownership and the
+collection. In both cases, AutoPasDM determines rank ownership and the
 simulator does not use a particle communicator.
 
 Initialization uses an all-to-all exchange because a particle may initially belong to
@@ -98,9 +98,9 @@ on the current split vectors rather than assuming equally sized subdomains.
 
 ## Runtime and communication context
 
-`dap::Runtime` owns the process communication runtime. The current backend is MPI,
+`autopasdm::Runtime` owns the process communication runtime. The current backend is MPI,
 but the application does not call MPI directly. Runtime duplicates a private MPI
-communicator for DistributedAutoPas so library messages do not collide with
+communicator for AutoPasDM so library messages do not collide with
 communication from other components using `MPI_COMM_WORLD`.
 
 Application utilities that need collectives use backend-neutral Runtime operations.
@@ -115,7 +115,7 @@ communication and load-balancing implementation.
 
 ## Particle serialization
 
-DistributedAutoPas does not assume a concrete particle layout on the wire. Particle
+AutoPasDM does not assume a concrete particle layout on the wire. Particle
 transport is parameterized by `ParticleSerializer<Particle>`. Applications can
 specialize or replace this serialization policy for their particle type while the
 migration and halo algorithms remain unchanged.
@@ -178,14 +178,14 @@ Periodic exchanges shift received particles into the periodic image adjacent to 
 local ownership box. `none` and `reflective` boundaries suppress communication across
 the corresponding global face.
 
-The halo width passed by `DistributedAutoPas` is currently the interaction cutoff.
+The halo width passed by `AutoPasDM` is currently the interaction cutoff.
 The load-balancing minimum domain width, in contrast, uses
 `2 * (cutoff + Verlet skin)` to match the adaptive-grid constraint used by
 md-flexible's inverted-pressure scheme.
 
 ## Adaptive load balancing
 
-DistributedAutoPas currently implements the inverted-pressure regular-grid load
+AutoPasDM currently implements the inverted-pressure regular-grid load
 balancer. It keeps the Cartesian process topology fixed and proposes new local
 ownership bounds from an application-provided local work measurement.
 
@@ -199,7 +199,7 @@ avoids overly aggressive geometry changes.
 
 A minimum subdomain width of `2 * (cutoff + Verlet skin)` is enforced. The load
 balancer itself only proposes bounds; applying them is intentionally owned by
-`DistributedAutoPas`.
+`AutoPasDM`.
 
 The adaptive synchronization sequence is:
 
@@ -233,7 +233,7 @@ The bundled md-flexible integration requests a balancing step only when
 `load-balancing-interval` is reached. The computational work is measured on the
 application side before distributed synchronization. `None` uses the static path.
 md-flexible's optional ALL/TENSOR load balancer is intentionally rejected because it
-requires different migration semantics and is not implemented in DistributedAutoPas.
+requires different migration semantics and is not implemented in AutoPasDM.
 
 ## Boundary physics
 
@@ -248,7 +248,7 @@ preparation and before the ordinary AutoPas interaction functor. Only thin
 wall-adjacent regions are traversed through `applyToOwnedParticlesInRegion()`.
 
 This keeps application-specific physical forces out of migration and halo code while
-still allowing DistributedAutoPas to provide the spatial operation needed to apply
+still allowing AutoPasDM to provide the spatial operation needed to apply
 them efficiently.
 
 ## Particle-local and distributed reductions
@@ -257,7 +257,7 @@ Simulator components such as the thermostat express local reductions through
 `sumOwnedParticles()` and distributed reductions through `globalSum()`. Output
 coordination uses Runtime operations such as `broadcastString()`. These components do
 not perform MPI collectives themselves. The simulator defines the physical quantity;
-DistributedAutoPas owns how values are traversed or reduced across ranks.
+AutoPasDM owns how values are traversed or reduced across ranks.
 
 ## Bundled example applications
 
@@ -265,21 +265,21 @@ DistributedAutoPas owns how values are traversed or reduced across ranks.
 
 `examples/lj` is a deliberately small simulator that demonstrates the intended
 application-facing interface. It uses AutoPas' `MoleculeLJ` particle and ordinary LJ
-functor, while DistributedAutoPas handles distributed ownership, migration, and halo
+functor, while AutoPasDM handles distributed ownership, migration, and halo
 exchange. No explicit MPI call is needed in the simulator code.
 
 ### md-flexible
 
 The adapted md-flexible simulator lives in `examples/md-flexible`. It is an
-application of DistributedAutoPas and may still depend directly on AutoPas for
+application of AutoPasDM and may still depend directly on AutoPas for
 particle types, interaction functors, and configuration options. The active simulation
 path no longer constructs or stores md-flexible's legacy `RegularGridDecomposition`;
 VTK domain output obtains local/global bounds and the domain rank from
-DistributedAutoPas. DistributedAutoPas is the active distributed ownership and
+AutoPasDM. AutoPasDM is the active distributed ownership and
 communication layer in this example.
 
 Particle insertion distinguishes between two input ownership models. For replicated
-configuration input, `dap::Runtime` tells the application which process expands the
+configuration input, `autopasdm::Runtime` tells the application which process expands the
 configured objects into particles. Object generation in `MDFlexConfig` therefore does
 not query MPI or the current rank. Those particles are inserted with
 `addParticlesFromRoot()`. Distributed checkpoint pieces use
@@ -291,11 +291,11 @@ The integration is restricted to `MD_FLEXIBLE_MODE=SINGLESITE`.
 
 ## Compiled and templated components
 
-DistributedAutoPas is intentionally a mixed compiled/template library.
+AutoPasDM is intentionally a mixed compiled/template library.
 Particle-dependent components remain in headers so arbitrary application particle
 types and serializers can instantiate them. Backend-independent, non-template
 implementation such as `DomainDecomposition` and non-template `Runtime` operations is
-compiled into the `distributed_autopas` library from `src/`.
+compiled into the `autopasdm` library from `src/`.
 
 The current `Runtime` header still contains the templated reduction helper and the
 private MPI communicator type. Moving the concrete communication backend fully behind
@@ -314,7 +314,7 @@ separate from the current implementation.
 - Halo exchange currently uses the cutoff as halo width.
 - Adaptive load balancing keeps the Cartesian process topology fixed.
 - Inverted Pressure is the only distributed load-balancing strategy implemented in
-  DistributedAutoPas; md-flexible's ALL/TENSOR option is not supported.
+  AutoPasDM; md-flexible's ALL/TENSOR option is not supported.
 - The bundled md-flexible integration currently supports the single-site particle
   model only.
 - Distributed algorithm / communication-backend selection is not yet part of the

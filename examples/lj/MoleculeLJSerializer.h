@@ -3,10 +3,10 @@
 #include <array>
 #include <cstddef>
 
-#include "distributed_autopas/ParticleSerialization.h"
+#include "autopasdm/ParticleSerialization.h"
 #include "molecularDynamicsLibrary/MoleculeLJ.h"
 
-namespace dap {
+namespace autopasdm {
 
 template <>
 struct ParticleSerializer<mdLib::MoleculeLJ> {
@@ -41,4 +41,4 @@ struct ParticleSerializer<mdLib::MoleculeLJ> {
   }
 };
 
-}  // namespace dap
+}  // namespace autopasdm

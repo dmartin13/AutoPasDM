@@ -1,6 +1,6 @@
-# DistributedAutoPas
+# AutoPasDM
 
-DistributedAutoPas is a distributed particle-container layer around AutoPas.
+AutoPasDM is a distributed particle-container layer around AutoPas.
 It keeps distributed ownership, migration, halo exchange, adaptive load balancing,
 and communication out of the simulator while reusing AutoPas for node-level particle
 storage, interaction traversal, and auto-tuning.
@@ -15,18 +15,18 @@ the physical Lennard-Jones mirror-wall force as application-level physics.
 
 The simulator-facing API deliberately exposes operations on the distributed particle
 system instead of the node-level AutoPas container. Existing AutoPas particle types
-and interaction functors can therefore be reused while DistributedAutoPas owns the
+and interaction functors can therefore be reused while AutoPasDM owns the
 distributed execution mechanisms.
 
 ## Repository layout
 
 ```text
-DistributedAutoPas/
-├── include/distributed_autopas/   # public headers and template code
+AutoPasDM/
+├── include/autopasdm/   # public headers and template code
 ├── src/                           # compiled non-template implementation
 ├── examples/
 │   ├── minimal_mpi.cpp            # low-level runtime / integration example
-│   ├── lj/                        # minimal LJ simulator using DistributedAutoPas
+│   ├── lj/                        # minimal LJ simulator using AutoPasDM
 │   └── md-flexible/               # md-flexible integration and regression inputs
 ├── docs/
 └── tests/
@@ -37,12 +37,12 @@ The expected development workspace is:
 ```text
 <workspace>/
 ├── AutoPas/
-└── DistributedAutoPas/
+└── AutoPasDM/
 ```
 
 ## Build
 
-From the DistributedAutoPas repository:
+From the AutoPasDM repository:
 
 ```bash
 cmake -S . -B build \
@@ -68,7 +68,7 @@ build/examples/lj/lj
 and a small md-flexible-particle integration example at:
 
 ```text
-build/examples/md-flexible/distributed-lj-example
+build/examples/md-flexible/autopasdm-lj-example
 ```
 
 ## Current feature set
@@ -93,7 +93,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details and design constrai
 
 ## Tests
 
-DistributedAutoPas tests use GoogleTest and are enabled by default for a standalone
+AutoPasDM tests use GoogleTest and are enabled by default for a standalone
 checkout. CTest launches MPI tests with their required rank counts. The suite covers,
 among other things:
 
@@ -102,7 +102,7 @@ among other things:
 - staged migration and halo exchange in 3D,
 - periodic, reflective, and open (`none`) topology,
 - split-phase non-blocking neighbor communication,
-- the public DistributedAutoPas interaction and operation API,
+- the public AutoPasDM interaction and operation API,
 - inverted-pressure boundary movement and minimum-width enforcement,
 - repeated adaptive load-balancing steps,
 - adaptive `targetRank()` ownership, and
@@ -118,7 +118,7 @@ ctest --test-dir build --output-on-failure
 ### md-flexible 3D force regression
 
 A small end-to-end regression input is available at
-`examples/md-flexible/input/dap_force_compare_3d.yaml`. It compares a single-rank
+`examples/md-flexible/input/autopasdm_force_compare_3d.yaml`. It compares a single-rank
 reference run with an eight-rank `2 x 2 x 2` decomposition and exercises internal
 face, edge, and corner interactions as well as periodic boundaries in all three
 dimensions.
@@ -130,11 +130,11 @@ rm -rf force_compare_3d/np1 force_compare_3d/np8
 mkdir -p force_compare_3d/np1 force_compare_3d/np8
 
 ./md-flexible \
-  --yaml-filename input/dap_force_compare_3d.yaml \
+  --yaml-filename input/autopasdm_force_compare_3d.yaml \
   --vtk-output-folder force_compare_3d/np1
 
 mpirun -np 8 ./md-flexible \
-  --yaml-filename input/dap_force_compare_3d.yaml \
+  --yaml-filename input/autopasdm_force_compare_3d.yaml \
   --vtk-output-folder force_compare_3d/np8
 
 python3 scripts/compare_vtk_forces.py \
@@ -147,8 +147,8 @@ configured tolerance.
 
 ### md-flexible load-balancing regression
 
-`examples/md-flexible/input/dap_load_balancing_compare.yaml` and
-`scripts/run_load_balancing_regression.py` compare the bundled DistributedAutoPas
+`examples/md-flexible/input/autopasdm_load_balancing_compare.yaml` and
+`scripts/run_load_balancing_regression.py` compare the bundled AutoPasDM
 integration against an MPI-enabled original md-flexible build. Both decompositions
 must adapt and the final global particle state is compared independently of the exact
 owner rank, because runtime-based work measurements can produce different adaptive
@@ -160,14 +160,14 @@ For example:
 python3 scripts/run_load_balancing_regression.py \
   --reference /path/to/AutoPas/build/examples/md-flexible/md-flexible \
   --distributed ./md-flexible \
-  --config input/dap_load_balancing_compare.yaml \
+  --config input/autopasdm_load_balancing_compare.yaml \
   --ranks 8
 ```
 
 ### md-flexible reflective-boundary regression
 
 The single-site md-flexible example contains a reflective-wall regression input at
-`examples/md-flexible/input/dap_reflective_compare.yaml`. It places particles near
+`examples/md-flexible/input/autopasdm_reflective_compare.yaml`. It places particles near
 all six global faces and two opposite corners. With sigma = epsilon = 1 and a wall
 distance of 0.5, the expected force component from each reflective wall is exactly
 24. The same setup can be compared between one rank and an eight-rank `2 x 2 x 2`
@@ -180,11 +180,11 @@ rm -rf reflective_compare/np1 reflective_compare/np8
 mkdir -p reflective_compare/np1 reflective_compare/np8
 
 ./md-flexible \
-  --yaml-filename input/dap_reflective_compare.yaml \
+  --yaml-filename input/autopasdm_reflective_compare.yaml \
   --vtk-output-folder reflective_compare/np1
 
 mpirun -np 8 ./md-flexible \
-  --yaml-filename input/dap_reflective_compare.yaml \
+  --yaml-filename input/autopasdm_reflective_compare.yaml \
   --vtk-output-folder reflective_compare/np8
 
 python3 scripts/compare_vtk_forces.py \
@@ -197,7 +197,7 @@ python3 scripts/check_reflective_forces.py reflective_compare/np8
 The first script checks decomposition independence. The second checks the forces
 against the analytical values of the reflective regression setup.
 
-The test build can be disabled with `-DDISTRIBUTED_AUTOPAS_BUILD_TESTS=OFF`.
+The test build can be disabled with `-DAUTOPASDM_BUILD_TESTS=OFF`.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the current architecture,
 design constraints, and remaining limitations.

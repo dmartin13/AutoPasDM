@@ -8,7 +8,7 @@
 #include <stdexcept>
 
 #include "Simulation.h"
-#include "distributed_autopas/Runtime.h"
+#include "autopasdm/Runtime.h"
 
 // Declare the main AutoPas class as extern template instantiation. It is instantiated in AutoPasClass.cpp.
 extern template class autopas::AutoPas<ParticleType>;
@@ -20,15 +20,14 @@ extern template class autopas::AutoPas<ParticleType>;
  * @return
  */
 int main(int argc, char **argv) {
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
   {
     MDFlexConfig configuration(argc, argv, runtime.isRoot());
 
-    // DistributedAutoPas currently supports md-flexible's InvertedPressure load balancer.
+    // AutoPasDM currently supports md-flexible's InvertedPressure load balancer.
     // ALL requires a different migration strategy and is intentionally not supported yet.
     if (configuration.loadBalancer.value == LoadBalancerOption::all) {
-      throw std::runtime_error(
-          "DistributedAutoPas does not support the ALL load balancer yet. Use InvertedPressure or None.");
+      throw std::runtime_error("AutoPasDM does not support the ALL load balancer yet. Use InvertedPressure or None.");
     }
     if (configuration.loadBalancer.value == LoadBalancerOption::invertedPressure and
         configuration.loadBalancingInterval.value == 0) {
@@ -44,7 +43,7 @@ int main(int argc, char **argv) {
     if (runtime.isRoot()) {
       std::cout << configuration.to_string() << std::endl;
       std::cout << std::endl << "Using " << autopas::autopas_get_max_threads() << " Threads" << std::endl;
-      std::cout << "DistributedAutoPas is running with " << runtime.size() << " ranks." << std::endl;
+      std::cout << "AutoPasDM is running with " << runtime.size() << " ranks." << std::endl;
     }
 
     Simulation simulation(configuration, runtime);

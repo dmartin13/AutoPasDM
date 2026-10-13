@@ -6,24 +6,24 @@
 #include "autopas/options/DataLayoutOption.h"
 #include "autopas/options/Newton3Option.h"
 #include "autopas/options/TraversalOption.h"
-#include "distributed_autopas/DistributedAutoPas.h"
-#include "distributed_autopas/Runtime.h"
+#include "autopasdm/AutoPasDM.h"
+#include "autopasdm/Runtime.h"
 #include "molecularDynamicsLibrary/LJFunctor.h"
 #include "src/TypeDefinitions.h"
 #include "src/distributed/MoleculeLJParticleSerializer.h"
 
 #if MD_FLEXIBLE_MODE == MULTISITE
-#error "The DistributedAutoPas LJ example currently supports SINGLESITE only."
+#error "The AutoPasDM LJ example currently supports SINGLESITE only."
 #endif
 
 int main(int argc, char **argv) {
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
 
   constexpr double cutoff = 1.0;
   const std::array<double, 3> globalMin{0.0, 0.0, 0.0};
   const std::array<double, 3> globalMax{10.0, 10.0, 10.0};
 
-  dap::DistributedAutoPas<ParticleType> particles(runtime, globalMin, globalMax, cutoff, [](auto &autoPas) {
+  autopasdm::AutoPasDM<ParticleType> particles(runtime, globalMin, globalMax, cutoff, [](auto &autoPas) {
     autoPas.setAllowedContainers({autopas::ContainerOption::directSum});
     autoPas.setAllowedTraversals({autopas::TraversalOption::ds_sequential});
     autoPas.setAllowedDataLayouts({autopas::DataLayoutOption::aos});

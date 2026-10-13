@@ -4,13 +4,13 @@
 #include <array>
 #include <vector>
 
-#include "distributed_autopas/DomainDecomposition.h"
-#include "distributed_autopas/HaloExchange.h"
-#include "distributed_autopas/Particle.h"
+#include "autopasdm/DomainDecomposition.h"
+#include "autopasdm/HaloExchange.h"
+#include "autopasdm/Particle.h"
 
 namespace {
 
-using Particle = dap::Particle;
+using Particle = autopasdm::Particle;
 
 constexpr std::array<double, 3> globalMin{0., 0., 0.};
 constexpr std::array<double, 3> globalMax{4., 1., 1.};
@@ -23,17 +23,17 @@ Particle makeParticle(unsigned long id, double x) {
   return particle;
 }
 
-dap::DomainDecomposition makeDomain(int &rank, int &numberOfRanks) {
+autopasdm::DomainDecomposition makeDomain(int &rank, int &numberOfRanks) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &numberOfRanks);
-  return dap::DomainDecomposition(rank, numberOfRanks, globalMin, globalMax);
+  return autopasdm::DomainDecomposition(rank, numberOfRanks, globalMin, globalMax);
 }
 
 struct TestContext {
   int rank{0};
   int numberOfRanks{0};
-  dap::DomainDecomposition domain;
-  dap::HaloExchange<Particle> haloExchange;
+  autopasdm::DomainDecomposition domain;
+  autopasdm::HaloExchange<Particle> haloExchange;
 
   TestContext() : domain(makeDomain(rank, numberOfRanks)), haloExchange(MPI_COMM_WORLD) {}
 };
@@ -138,8 +138,8 @@ TEST(HaloExchangeTest, PropagatesFaceEdgeAndCornerHalosInThreeDimensions) {
 
   const std::array<double, 3> min{0., 0., 0.};
   const std::array<double, 3> max{2., 2., 2.};
-  const dap::DomainDecomposition domain(rank, numberOfRanks, min, max, std::array<int, 3>{2, 2, 2});
-  const dap::HaloExchange<Particle> haloExchange(MPI_COMM_WORLD);
+  const autopasdm::DomainDecomposition domain(rank, numberOfRanks, min, max, std::array<int, 3>{2, 2, 2});
+  const autopasdm::HaloExchange<Particle> haloExchange(MPI_COMM_WORLD);
 
   std::vector<Particle> ownedParticles;
   if (rank == 0) {
@@ -170,8 +170,8 @@ TEST(HaloExchangeTest, ShiftsPeriodicCornerHaloAcrossAllDimensions) {
 
   const std::array<double, 3> min{0., 0., 0.};
   const std::array<double, 3> max{2., 2., 2.};
-  const dap::DomainDecomposition domain(rank, numberOfRanks, min, max, std::array<int, 3>{2, 2, 2});
-  const dap::HaloExchange<Particle> haloExchange(MPI_COMM_WORLD);
+  const autopasdm::DomainDecomposition domain(rank, numberOfRanks, min, max, std::array<int, 3>{2, 2, 2});
+  const autopasdm::HaloExchange<Particle> haloExchange(MPI_COMM_WORLD);
 
   std::vector<Particle> ownedParticles;
   if (rank == 7) {
@@ -201,8 +201,8 @@ TEST(HaloExchangeTest, CreatesPeriodicHalosLocallyForUndecomposedDimension) {
 
   const std::array<double, 3> min{0., 0., 0.};
   const std::array<double, 3> max{4., 1., 1.};
-  const dap::DomainDecomposition domain(rank, numberOfRanks, min, max, std::array<int, 3>{4, 1, 1});
-  const dap::HaloExchange<Particle> haloExchange(MPI_COMM_WORLD);
+  const autopasdm::DomainDecomposition domain(rank, numberOfRanks, min, max, std::array<int, 3>{4, 1, 1});
+  const autopasdm::HaloExchange<Particle> haloExchange(MPI_COMM_WORLD);
 
   Particle lowerParticle;
   lowerParticle.setID(static_cast<unsigned long>(9000 + rank * 10));
@@ -228,11 +228,11 @@ TEST(HaloExchangeTest, NoneBoundarySuppressesGlobalHaloButKeepsInternalHalo) {
   MPI_Comm_size(MPI_COMM_WORLD, &numberOfRanks);
   ASSERT_EQ(numberOfRanks, 8);
 
-  constexpr std::array<dap::BoundaryType, 3> boundaries{dap::BoundaryType::none, dap::BoundaryType::none,
-                                                        dap::BoundaryType::none};
-  const dap::DomainDecomposition domain(rank, numberOfRanks, {0., 0., 0.}, {2., 2., 2.}, std::array<int, 3>{2, 2, 2},
-                                        boundaries);
-  const dap::HaloExchange<Particle> haloExchange(MPI_COMM_WORLD);
+  constexpr std::array<autopasdm::BoundaryType, 3> boundaries{
+      autopasdm::BoundaryType::none, autopasdm::BoundaryType::none, autopasdm::BoundaryType::none};
+  const autopasdm::DomainDecomposition domain(rank, numberOfRanks, {0., 0., 0.}, {2., 2., 2.},
+                                              std::array<int, 3>{2, 2, 2}, boundaries);
+  const autopasdm::HaloExchange<Particle> haloExchange(MPI_COMM_WORLD);
 
   std::vector<Particle> ownedParticles;
   if (rank == 0) {
@@ -258,11 +258,11 @@ TEST(HaloExchangeTest, ReflectiveBoundarySuppressesGlobalHaloButKeepsInternalHal
   MPI_Comm_size(MPI_COMM_WORLD, &numberOfRanks);
   ASSERT_EQ(numberOfRanks, 4);
 
-  constexpr std::array<dap::BoundaryType, 3> boundaries{dap::BoundaryType::reflective, dap::BoundaryType::none,
-                                                        dap::BoundaryType::none};
-  const dap::DomainDecomposition domain(rank, numberOfRanks, {0., 0., 0.}, {4., 1., 1.}, std::array<int, 3>{4, 1, 1},
-                                        boundaries);
-  const dap::HaloExchange<Particle> haloExchange(MPI_COMM_WORLD);
+  constexpr std::array<autopasdm::BoundaryType, 3> boundaries{
+      autopasdm::BoundaryType::reflective, autopasdm::BoundaryType::none, autopasdm::BoundaryType::none};
+  const autopasdm::DomainDecomposition domain(rank, numberOfRanks, {0., 0., 0.}, {4., 1., 1.},
+                                              std::array<int, 3>{4, 1, 1}, boundaries);
+  const autopasdm::HaloExchange<Particle> haloExchange(MPI_COMM_WORLD);
 
   std::vector<Particle> ownedParticles;
   if (rank == 0) {

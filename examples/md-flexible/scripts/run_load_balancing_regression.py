@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the same adaptive md-flexible case with reference md-flexible and DistributedAutoPas.
+"""Run the same adaptive md-flexible case with reference md-flexible and AutoPasDM.
 
 The comparison deliberately does not require identical adaptive subdomain boundaries:
 Inverted Pressure uses measured local computation times, so exact boundaries can differ
@@ -12,7 +12,7 @@ Example:
     python3 scripts/run_load_balancing_regression.py \
         --reference /path/to/AutoPas/build/examples/md-flexible/md-flexible \
         --distributed ./md-flexible \
-        --config input/dap_load_balancing_compare.yaml \
+        --config input/autopasdm_load_balancing_compare.yaml \
         --ranks 8
 
 For SLURM, e.g. use:
@@ -42,7 +42,7 @@ RANK_FILE_RE = re.compile(r"_Ranks_(\d+)_(\d+)\.vtu$")
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reference", required=True, type=Path, help="Original md-flexible executable")
-    parser.add_argument("--distributed", required=True, type=Path, help="DistributedAutoPas md-flexible executable")
+    parser.add_argument("--distributed", required=True, type=Path, help="AutoPasDM md-flexible executable")
     parser.add_argument("--config", required=True, type=Path, help="YAML input shared by both runs")
     parser.add_argument("--ranks", type=int, default=8, help="MPI ranks (default: 8)")
     parser.add_argument(
@@ -270,42 +270,42 @@ def main() -> int:
             work_root.mkdir(parents=True)
             cleanup = None
         else:
-            cleanup = tempfile.TemporaryDirectory(prefix="dap_load_balancing_regression_")
+            cleanup = tempfile.TemporaryDirectory(prefix="autopasdm_load_balancing_regression_")
             work_root = Path(cleanup.name)
 
         reference_root = work_root / "reference"
         distributed_root = work_root / "distributed"
 
         run_case("reference md-flexible", reference, config, reference_root, launcher)
-        run_case("DistributedAutoPas md-flexible", distributed, config, distributed_root, launcher)
+        run_case("AutoPasDM md-flexible", distributed, config, distributed_root, launcher)
 
         ref_initial, ref_final, ref_movement = maximum_boundary_movement(reference_root)
-        dap_initial, dap_final, dap_movement = maximum_boundary_movement(distributed_root)
+        autopasdm_initial, autopasdm_final, autopasdm_movement = maximum_boundary_movement(distributed_root)
 
         print("\nAdaptive-domain check:")
         print(f"  reference   iterations {ref_initial}->{ref_final}, max boundary movement {ref_movement:.12g}")
-        print(f"  distributed iterations {dap_initial}->{dap_final}, max boundary movement {dap_movement:.12g}")
+        print(f"  distributed iterations {autopasdm_initial}->{autopasdm_final}, max boundary movement {autopasdm_movement:.12g}")
 
         boundaries_ok = True
         if ref_movement <= args.boundary_move_tolerance:
             print("FAIL: reference md-flexible did not measurably change its decomposition.")
             boundaries_ok = False
-        if dap_movement <= args.boundary_move_tolerance:
-            print("FAIL: DistributedAutoPas did not measurably change its decomposition.")
+        if autopasdm_movement <= args.boundary_move_tolerance:
+            print("FAIL: AutoPasDM did not measurably change its decomposition.")
             boundaries_ok = False
 
         ref_iteration, ref_particles = read_particle_state(reference_root)
-        dap_iteration, dap_particles = read_particle_state(distributed_root)
+        autopasdm_iteration, autopasdm_particles = read_particle_state(distributed_root)
 
         print("\nFinal-state comparison:")
         print(f"  reference final iteration   : {ref_iteration}")
-        print(f"  distributed final iteration : {dap_iteration}")
+        print(f"  distributed final iteration : {autopasdm_iteration}")
         print(f"  reference owned particles   : {len(ref_particles)}")
-        print(f"  distributed owned particles : {len(dap_particles)}")
+        print(f"  distributed owned particles : {len(autopasdm_particles)}")
 
         states_ok, ownership_changes, maximum_difference = compare_states(
             ref_particles,
-            dap_particles,
+            autopasdm_particles,
             args.absolute_tolerance,
             args.relative_tolerance,
         )

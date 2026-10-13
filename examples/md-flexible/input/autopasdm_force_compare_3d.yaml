@@ -1,7 +1,7 @@
-# 3D force-comparison regression test for DistributedAutoPas + md-flexible.
+# 3D force-comparison regression test for AutoPasDM + md-flexible.
 #
 # Run with 1 and 8 MPI ranks and compare final owned-particle forces.
-# With 8 ranks and subdivide-dimension enabled in all dimensions, DAP uses a
+# With 8 ranks and subdivide-dimension enabled in all dimensions, AutoPasDM uses a
 # 2 x 2 x 2 process grid.
 #
 # The particle pairs deliberately exercise:
@@ -36,7 +36,7 @@ boundary-type: [periodic, periodic, periodic]
 subdivide-dimension: [true, true, true]
 load-balancer: None
 
-vtk-filename: dapForceCompare3D
+vtk-filename: autoPasDMForceCompare3D
 vtk-write-frequency: 1
 no-progress-bar: true
 no-end-config: true

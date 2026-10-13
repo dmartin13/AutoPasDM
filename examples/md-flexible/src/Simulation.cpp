@@ -82,20 +82,20 @@ size_t getTerminalWidth() {
   return terminalWidth;
 }
 
-std::array<dap::BoundaryType, 3> toDistributedBoundaryTypes(
+std::array<autopasdm::BoundaryType, 3> toDistributedBoundaryTypes(
     const std::array<options::BoundaryTypeOption, 3> &boundaryTypes) {
-  std::array<dap::BoundaryType, 3> result{};
+  std::array<autopasdm::BoundaryType, 3> result{};
 
   for (std::size_t dimension = 0; dimension < 3; ++dimension) {
     switch (static_cast<options::BoundaryTypeOption::Value>(boundaryTypes[dimension])) {
       case options::BoundaryTypeOption::periodic:
-        result[dimension] = dap::BoundaryType::periodic;
+        result[dimension] = autopasdm::BoundaryType::periodic;
         break;
       case options::BoundaryTypeOption::reflective:
-        result[dimension] = dap::BoundaryType::reflective;
+        result[dimension] = autopasdm::BoundaryType::reflective;
         break;
       case options::BoundaryTypeOption::none:
-        result[dimension] = dap::BoundaryType::none;
+        result[dimension] = autopasdm::BoundaryType::none;
         break;
     }
   }
@@ -104,7 +104,7 @@ std::array<dap::BoundaryType, 3> toDistributedBoundaryTypes(
 }
 }  // namespace
 
-Simulation::Simulation(const MDFlexConfig &configuration, dap::Runtime &runtime)
+Simulation::Simulation(const MDFlexConfig &configuration, autopasdm::Runtime &runtime)
     : _configuration(configuration), _totalEnergySensor(configuration.energySensorOption.value) {
   _timers.total.start();
   _timers.initialization.start();
@@ -155,9 +155,9 @@ Simulation::Simulation(const MDFlexConfig &configuration, dap::Runtime &runtime)
     std::cout << "WARNING: No functor was specified. Defaulting to " << functorName << std::endl;
   }
 
-  // DistributedAutoPas owns the node-local AutoPas instance. md-flexible interacts
+  // AutoPasDM owns the node-local AutoPas instance. md-flexible interacts
   // only with the distributed particle API and does not access the local container directly.
-  _distributedAutoPasContainer = std::make_shared<DistributedContainerType>(
+  _autoPasDMContainer = std::make_shared<DistributedContainerType>(
       runtime, _configuration.boxMin.value, _configuration.boxMax.value, _configuration.cutoff.value,
       _configuration.subdivideDimension.value, toDistributedBoundaryTypes(_configuration.boundaryOption.value),
       [&](auto &autoPas) {
@@ -179,7 +179,7 @@ Simulation::Simulation(const MDFlexConfig &configuration, dap::Runtime &runtime)
                                          autopas::InteractionTypeOption::triwise);
         autoPas.setAllowedTraversals(_configuration.traversalOptions3B.value, autopas::InteractionTypeOption::triwise);
 
-        // General AutoPas options. Box and cutoff are owned by DistributedAutoPas and are
+        // General AutoPas options. Box and cutoff are owned by AutoPasDM and are
         // therefore intentionally not configured here.
         autoPas.setRelativeOptimumRange(_configuration.relativeOptimumRange.value);
         autoPas.setMaxTuningPhasesWithoutTest(_configuration.maxTuningPhasesWithoutTest.value);
@@ -214,7 +214,7 @@ Simulation::Simulation(const MDFlexConfig &configuration, dap::Runtime &runtime)
 
   // Throw an error if there is not more than one configuration to test in the search space but more than one tuning
   // phase is requested
-  if (_distributedAutoPasContainer->localSearchSpaceIsTrivial() and _configuration.tuningPhases.value > 0) {
+  if (_autoPasDMContainer->localSearchSpaceIsTrivial() and _configuration.tuningPhases.value > 0) {
     throw std::runtime_error(
         "Search space must not be trivial if the simulation time is limited by the number tuning phases");
   }
@@ -224,12 +224,12 @@ Simulation::Simulation(const MDFlexConfig &configuration, dap::Runtime &runtime)
 
   if (_configuration.useThermostat.value and _configuration.deltaT.value != 0) {
     if (_configuration.addBrownianMotion.value) {
-      Thermostat::addBrownianMotion(*_distributedAutoPasContainer, *(_configuration.getParticlePropertiesLibrary()),
+      Thermostat::addBrownianMotion(*_autoPasDMContainer, *(_configuration.getParticlePropertiesLibrary()),
                                     _configuration.initTemperature.value);
     }
 
     // Set the simulation directly to the desired initial temperature.
-    Thermostat::apply(*_distributedAutoPasContainer, *(_configuration.getParticlePropertiesLibrary()),
+    Thermostat::apply(*_autoPasDMContainer, *(_configuration.getParticlePropertiesLibrary()),
                       _configuration.initTemperature.value, std::numeric_limits<double>::max());
   }
 
@@ -239,11 +239,11 @@ Simulation::Simulation(const MDFlexConfig &configuration, dap::Runtime &runtime)
 void Simulation::finalize() {
   _timers.total.stop();
   _totalEnergySensor.endMeasurement();
-  _distributedAutoPasContainer->barrier();
+  _autoPasDMContainer->barrier();
 
   logSimulationState();
   logMeasurements();
-  _distributedAutoPasContainer->finalize();
+  _autoPasDMContainer->finalize();
 }
 
 void Simulation::run() {
@@ -258,7 +258,7 @@ void Simulation::run() {
   while (needsMoreIterations()) {
     if (_vtkWriter.has_value() and _iteration % _configuration.vtkWriteFrequency.value == 0) {
       _timers.vtk.start();
-      _vtkWriter->recordTimestep(_iteration, *_distributedAutoPasContainer);
+      _vtkWriter->recordTimestep(_iteration, *_autoPasDMContainer);
       _timers.vtk.stop();
     }
 
@@ -272,7 +272,7 @@ void Simulation::run() {
 
     // Match md-flexible's adaptive-grid cadence. The application measures the local
     // computational work before distributed synchronization and only requests a balancing
-    // step at the configured interval. DistributedAutoPas owns the actual geometry update,
+    // step at the configured interval. AutoPasDM owns the actual geometry update,
     // resize, migration, and halo exchange.
     const bool shouldLoadBalance = _configuration.loadBalancer.value == LoadBalancerOption::invertedPressure and
                                    _configuration.deltaT.value != 0 and not _simulationIsPaused and
@@ -281,15 +281,14 @@ void Simulation::run() {
     _timers.distributedSynchronization.start();
     if (shouldLoadBalance) {
       const auto computationalLoad = static_cast<double>(_timers.computationalLoad.stop());
-      _distributedAutoPasContainer->prepareInteractions(computationalLoad);
+      _autoPasDMContainer->prepareInteractions(computationalLoad);
     } else {
-      _distributedAutoPasContainer->prepareInteractions();
+      _autoPasDMContainer->prepareInteractions();
     }
     _timers.distributedSynchronization.stop();
 
     _timers.reflectParticlesAtBoundaries.start();
-    ReflectiveBoundary::apply(*_distributedAutoPasContainer, *_configuration.getParticlePropertiesLibrary(),
-                              maximumSigma);
+    ReflectiveBoundary::apply(*_autoPasDMContainer, *_configuration.getParticlePropertiesLibrary(), maximumSigma);
     _timers.reflectParticlesAtBoundaries.stop();
 
     if (shouldLoadBalance) {
@@ -313,9 +312,9 @@ void Simulation::run() {
     }
     _timers.computationalLoad.stop();
 #ifdef MD_FLEXIBLE_CALC_GLOBALS
-    const auto potentialEnergyGlobal = _distributedAutoPasContainer->globalSum(_totalPotentialEnergy);
-    const auto virialSumGlobal = _distributedAutoPasContainer->globalSum(_totalVirialSum);
-    if (_distributedAutoPasContainer->isRoot()) {
+    const auto potentialEnergyGlobal = _autoPasDMContainer->globalSum(_totalPotentialEnergy);
+    const auto virialSumGlobal = _autoPasDMContainer->globalSum(_totalVirialSum);
+    if (_autoPasDMContainer->isRoot()) {
       _globalLogger->logGlobals(_iteration, potentialEnergyGlobal, virialSumGlobal);
     }
     _totalPotentialEnergy = 0.;
@@ -326,11 +325,11 @@ void Simulation::run() {
     }
 
     if (autopas::Logger::get()->level() <= autopas::Logger::LogLevel::debug) {
-      std::cout << "Current Memory usage on rank " << _distributedAutoPasContainer->rank() << ": "
+      std::cout << "Current Memory usage on rank " << _autoPasDMContainer->rank() << ": "
                 << autopas::memoryProfiler::currentMemoryUsage() << " kB\n";
     }
 
-    if (_distributedAutoPasContainer->isRoot()) {
+    if (_autoPasDMContainer->isRoot()) {
       auto [maxIterationsEstimate, maxIterationsIsPrecise] = estimateNumberOfIterations();
       if (not _configuration.dontShowProgressBar.value) {
         printProgress(_iteration, maxIterationsEstimate, maxIterationsIsPrecise);
@@ -341,7 +340,7 @@ void Simulation::run() {
 
   // Record last state of simulation.
   if (_vtkWriter.has_value()) {
-    _vtkWriter->recordTimestep(_iteration, *_distributedAutoPasContainer);
+    _vtkWriter->recordTimestep(_iteration, *_autoPasDMContainer);
   }
 }
 
@@ -462,7 +461,7 @@ std::string Simulation::timerToString(const std::string &name, long timeNS, int 
 void Simulation::updatePositionsAndResetForces() {
   _timers.positionUpdate.start();
   TimeDiscretization::calculatePositionsAndResetForces(
-      *_distributedAutoPasContainer, *(_configuration.getParticlePropertiesLibrary()), _configuration.deltaT.value,
+      *_autoPasDMContainer, *(_configuration.getParticlePropertiesLibrary()), _configuration.deltaT.value,
       _configuration.globalForce.value, _configuration.fastParticlesThrow.value);
   _timers.positionUpdate.stop();
 }
@@ -470,7 +469,7 @@ void Simulation::updatePositionsAndResetForces() {
 void Simulation::updateQuaternions() {
   _timers.quaternionUpdate.start();
   TimeDiscretization::calculateQuaternionsAndResetTorques(
-      *_distributedAutoPasContainer, *(_configuration.getParticlePropertiesLibrary()), _configuration.deltaT.value,
+      *_autoPasDMContainer, *(_configuration.getParticlePropertiesLibrary()), _configuration.deltaT.value,
       _configuration.globalForce.value);
   _timers.quaternionUpdate.stop();
 }
@@ -516,8 +515,8 @@ void Simulation::updateVelocities() {
 
   if (deltaT != 0) {
     _timers.velocityUpdate.start();
-    TimeDiscretization::calculateVelocities(*_distributedAutoPasContainer,
-                                            *(_configuration.getParticlePropertiesLibrary()), deltaT);
+    TimeDiscretization::calculateVelocities(*_autoPasDMContainer, *(_configuration.getParticlePropertiesLibrary()),
+                                            deltaT);
     _timers.velocityUpdate.stop();
   }
 }
@@ -526,25 +525,25 @@ void Simulation::updateAngularVelocities() {
   const double deltaT = _configuration.deltaT.value;
 
   _timers.angularVelocityUpdate.start();
-  TimeDiscretization::calculateAngularVelocities(*_distributedAutoPasContainer,
-                                                 *(_configuration.getParticlePropertiesLibrary()), deltaT);
+  TimeDiscretization::calculateAngularVelocities(*_autoPasDMContainer, *(_configuration.getParticlePropertiesLibrary()),
+                                                 deltaT);
   _timers.angularVelocityUpdate.stop();
 }
 
 void Simulation::updateThermostat() {
   if (_configuration.useThermostat.value and (_iteration % _configuration.thermostatInterval.value) == 0) {
     _timers.thermostat.start();
-    Thermostat::apply(*_distributedAutoPasContainer, *(_configuration.getParticlePropertiesLibrary()),
+    Thermostat::apply(*_autoPasDMContainer, *(_configuration.getParticlePropertiesLibrary()),
                       _configuration.targetTemperature.value, _configuration.deltaTemp.value);
     _timers.thermostat.stop();
   }
 }
 
-long Simulation::accumulateTime(const long &time) { return _distributedAutoPasContainer->globalSum(time); }
+long Simulation::accumulateTime(const long &time) { return _autoPasDMContainer->globalSum(time); }
 
 bool Simulation::calculatePairwiseForces() {
   const auto wasTuningIteration = applyWithChosenFunctor<bool>([&](auto &&functor) {
-    auto isTuningIteration = _distributedAutoPasContainer->computeInteractionsPrepared(&functor);
+    auto isTuningIteration = _autoPasDMContainer->computeInteractionsPrepared(&functor);
 #ifdef MD_FLEXIBLE_CALC_GLOBALS
     _totalPotentialEnergy += functor.getPotentialEnergy();
     _totalVirialSum += functor.getVirial();
@@ -556,7 +555,7 @@ bool Simulation::calculatePairwiseForces() {
 
 bool Simulation::calculateTriwiseForces() {
   const auto wasTuningIteration = applyWithChosenFunctor3B<bool>([&](auto &&functor) {
-    auto isTuningIteration = _distributedAutoPasContainer->computeInteractionsPrepared(&functor);
+    auto isTuningIteration = _autoPasDMContainer->computeInteractionsPrepared(&functor);
 #ifdef MD_FLEXIBLE_CALC_GLOBALS
     _totalPotentialEnergy += functor.getPotentialEnergy();
     _totalVirialSum += functor.getVirial();
@@ -567,16 +566,15 @@ bool Simulation::calculateTriwiseForces() {
 }
 
 void Simulation::calculateGlobalForces(const std::array<double, 3> &globalForce) {
-  _distributedAutoPasContainer->applyToOwnedParticles([&](auto &particle) { particle.addF(globalForce); });
+  _autoPasDMContainer->applyToOwnedParticles([&](auto &particle) { particle.addF(globalForce); });
 }
 
 void Simulation::logSimulationState() {
-  const auto ownedParticles = _distributedAutoPasContainer->getGlobalNumberOfOwnedParticles();
-  const auto haloParticles =
-      _distributedAutoPasContainer->globalSum(_distributedAutoPasContainer->getLocalNumberOfHaloParticles());
+  const auto ownedParticles = _autoPasDMContainer->getGlobalNumberOfOwnedParticles();
+  const auto haloParticles = _autoPasDMContainer->globalSum(_autoPasDMContainer->getLocalNumberOfHaloParticles());
   const auto totalNumberOfParticles = ownedParticles + haloParticles;
 
-  if (_distributedAutoPasContainer->isRoot()) {
+  if (_autoPasDMContainer->isRoot()) {
     std::cout << "\n\n"
               << "Total number of particles at the end of Simulation: " << totalNumberOfParticles << "\n"
               << "Owned: " << ownedParticles << "\n"
@@ -596,7 +594,7 @@ void Simulation::updateSimulationPauseState() {
     std::cout << "Iteration " << _iteration << ": Resuming simulation after tuning phase.\n";
 
     // reset the forces which accumulated during the tuning phase
-    _distributedAutoPasContainer->applyToOwnedParticles(
+    _autoPasDMContainer->applyToOwnedParticles(
         [&](auto &particle) { particle.setF(_configuration.globalForce.value); });
 
     // calculate the forces of the latest iteration again
@@ -627,50 +625,55 @@ void Simulation::logMeasurements() {
   const long migratingParticleExchange = accumulateTime(_timers.migratingParticleExchange.getTotalTime());
   const long loadBalancing = accumulateTime(_timers.loadBalancing.getTotalTime());
   const long distributedSynchronization = accumulateTime(_timers.distributedSynchronization.getTotalTime());
-#ifdef DAP_ENABLE_TIMERS
-  const auto dapPerformanceCounters = _distributedAutoPasContainer->getPerformanceCountersSnapshot();
-  const auto accumulateDapTime = [&](std::uint64_t localTime) {
-    return static_cast<long>(_distributedAutoPasContainer->globalSum(localTime));
+#ifdef AUTOPASDM_ENABLE_TIMERS
+  const auto autoPasDMPerformanceCounters = _autoPasDMContainer->getPerformanceCountersSnapshot();
+  const auto accumulateAutoPasDMTime = [&](std::uint64_t localTime) {
+    return static_cast<long>(_autoPasDMContainer->globalSum(localTime));
   };
-  const long dapSynchronization = accumulateDapTime(dapPerformanceCounters.synchronizationNs);
-  const long dapUpdateContainer = accumulateDapTime(dapPerformanceCounters.updateContainerNs);
-  const long dapLoadBalancing = accumulateDapTime(dapPerformanceCounters.loadBalancingNs);
-  const long dapBoundarySynchronization = accumulateDapTime(dapPerformanceCounters.boundarySynchronizationNs);
-  const long dapResizeBox = accumulateDapTime(dapPerformanceCounters.resizeBoxNs);
-  const long dapMigration = accumulateDapTime(dapPerformanceCounters.migrationNs);
-  const long dapAddMigratedParticles = accumulateDapTime(dapPerformanceCounters.addMigratedParticlesNs);
-  const long dapOwnedParticleCollection = accumulateDapTime(dapPerformanceCounters.ownedParticleCollectionNs);
-  const long dapHaloExchange = accumulateDapTime(dapPerformanceCounters.haloExchangeNs);
-  const long dapAddHaloParticles = accumulateDapTime(dapPerformanceCounters.addHaloParticlesNs);
-#ifdef DAP_ENABLE_DETAILED_TIMERS
-  const long dapMigrationClassification = accumulateDapTime(dapPerformanceCounters.migrationClassificationNs);
-  const long dapHaloInitialCopy = accumulateDapTime(dapPerformanceCounters.haloInitialCopyNs);
-  const long dapHaloSelection = accumulateDapTime(dapPerformanceCounters.haloSelectionNs);
-  const long dapHaloPeriodicShift = accumulateDapTime(dapPerformanceCounters.haloPeriodicShiftNs);
-  const long dapHaloBufferInsertion = accumulateDapTime(dapPerformanceCounters.haloBufferInsertionNs);
-  const long dapCommunicationPack = accumulateDapTime(dapPerformanceCounters.communicationPackNs);
-  const long dapCommunicationCountExchange = accumulateDapTime(dapPerformanceCounters.communicationCountExchangeNs);
-  const long dapCommunicationPayloadWait = accumulateDapTime(dapPerformanceCounters.communicationPayloadWaitNs);
-  const long dapCommunicationUnpack = accumulateDapTime(dapPerformanceCounters.communicationUnpackNs);
+  const long autoPasDMSynchronization = accumulateAutoPasDMTime(autoPasDMPerformanceCounters.synchronizationNs);
+  const long autoPasDMUpdateContainer = accumulateAutoPasDMTime(autoPasDMPerformanceCounters.updateContainerNs);
+  const long autoPasDMLoadBalancing = accumulateAutoPasDMTime(autoPasDMPerformanceCounters.loadBalancingNs);
+  const long autoPasDMBoundarySynchronization =
+      accumulateAutoPasDMTime(autoPasDMPerformanceCounters.boundarySynchronizationNs);
+  const long autoPasDMResizeBox = accumulateAutoPasDMTime(autoPasDMPerformanceCounters.resizeBoxNs);
+  const long autoPasDMMigration = accumulateAutoPasDMTime(autoPasDMPerformanceCounters.migrationNs);
+  const long autoPasDMAddMigratedParticles =
+      accumulateAutoPasDMTime(autoPasDMPerformanceCounters.addMigratedParticlesNs);
+  const long autoPasDMOwnedParticleCollection =
+      accumulateAutoPasDMTime(autoPasDMPerformanceCounters.ownedParticleCollectionNs);
+  const long autoPasDMHaloExchange = accumulateAutoPasDMTime(autoPasDMPerformanceCounters.haloExchangeNs);
+  const long autoPasDMAddHaloParticles = accumulateAutoPasDMTime(autoPasDMPerformanceCounters.addHaloParticlesNs);
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
+  const long autoPasDMMigrationClassification =
+      accumulateAutoPasDMTime(autoPasDMPerformanceCounters.migrationClassificationNs);
+  const long autoPasDMHaloInitialCopy = accumulateAutoPasDMTime(autoPasDMPerformanceCounters.haloInitialCopyNs);
+  const long autoPasDMHaloSelection = accumulateAutoPasDMTime(autoPasDMPerformanceCounters.haloSelectionNs);
+  const long autoPasDMHaloPeriodicShift = accumulateAutoPasDMTime(autoPasDMPerformanceCounters.haloPeriodicShiftNs);
+  const long autoPasDMHaloBufferInsertion = accumulateAutoPasDMTime(autoPasDMPerformanceCounters.haloBufferInsertionNs);
+  const long autoPasDMCommunicationPack = accumulateAutoPasDMTime(autoPasDMPerformanceCounters.communicationPackNs);
+  const long autoPasDMCommunicationCountExchange =
+      accumulateAutoPasDMTime(autoPasDMPerformanceCounters.communicationCountExchangeNs);
+  const long autoPasDMCommunicationPayloadWait =
+      accumulateAutoPasDMTime(autoPasDMPerformanceCounters.communicationPayloadWaitNs);
+  const long autoPasDMCommunicationUnpack = accumulateAutoPasDMTime(autoPasDMPerformanceCounters.communicationUnpackNs);
 
   const auto migrationParticlesSent =
-      _distributedAutoPasContainer->globalSum(dapPerformanceCounters.migrationParticlesSent);
+      _autoPasDMContainer->globalSum(autoPasDMPerformanceCounters.migrationParticlesSent);
   const auto migrationParticlesReceived =
-      _distributedAutoPasContainer->globalSum(dapPerformanceCounters.migrationParticlesReceived);
-  const auto haloParticlesSent = _distributedAutoPasContainer->globalSum(dapPerformanceCounters.haloParticlesSent);
-  const auto haloParticlesReceived =
-      _distributedAutoPasContainer->globalSum(dapPerformanceCounters.haloParticlesReceived);
+      _autoPasDMContainer->globalSum(autoPasDMPerformanceCounters.migrationParticlesReceived);
+  const auto haloParticlesSent = _autoPasDMContainer->globalSum(autoPasDMPerformanceCounters.haloParticlesSent);
+  const auto haloParticlesReceived = _autoPasDMContainer->globalSum(autoPasDMPerformanceCounters.haloParticlesReceived);
   const auto communicationBytesSent =
-      _distributedAutoPasContainer->globalSum(dapPerformanceCounters.communicationBytesSent);
+      _autoPasDMContainer->globalSum(autoPasDMPerformanceCounters.communicationBytesSent);
   const auto communicationBytesReceived =
-      _distributedAutoPasContainer->globalSum(dapPerformanceCounters.communicationBytesReceived);
+      _autoPasDMContainer->globalSum(autoPasDMPerformanceCounters.communicationBytesReceived);
 #endif
 #endif
 #ifdef AUTOPAS_ENABLE_ENERGY_MEASUREMENTS
-  const double totalEnergy = _distributedAutoPasContainer->globalSum(_totalEnergySensor.getJoules());
+  const double totalEnergy = _autoPasDMContainer->globalSum(_totalEnergySensor.getJoules());
 #endif
 
-  if (_distributedAutoPasContainer->isRoot()) {
+  if (_autoPasDMContainer->isRoot()) {
     const long wallClockTime = _timers.total.getTotalTime();
     // use the two potentially largest timers to determine the number of chars needed
     const auto maximumNumberOfDigits =
@@ -711,47 +714,47 @@ void Simulation::logMeasurements() {
     std::cout << timerToString("    LoadBalancing                 ", loadBalancing, maximumNumberOfDigits, simulate);
     std::cout << timerToString("    DistributedSynchronization    ", distributedSynchronization, maximumNumberOfDigits,
                                simulate);
-#ifdef DAP_ENABLE_TIMERS
-    std::cout << timerToString("      DAP CoreSynchronization     ", dapSynchronization, maximumNumberOfDigits,
-                               distributedSynchronization);
-    std::cout << timerToString("        DAP UpdateContainer       ", dapUpdateContainer, maximumNumberOfDigits,
-                               dapSynchronization);
-    std::cout << timerToString("        DAP LoadBalancing         ", dapLoadBalancing, maximumNumberOfDigits,
-                               dapSynchronization);
-    std::cout << timerToString("        DAP BoundarySync          ", dapBoundarySynchronization, maximumNumberOfDigits,
-                               dapSynchronization);
-    std::cout << timerToString("        DAP ResizeBox             ", dapResizeBox, maximumNumberOfDigits,
-                               dapSynchronization);
-    std::cout << timerToString("        DAP Migration             ", dapMigration, maximumNumberOfDigits,
-                               dapSynchronization);
-    std::cout << timerToString("        DAP AddMigratedParticles  ", dapAddMigratedParticles, maximumNumberOfDigits,
-                               dapSynchronization);
-    std::cout << timerToString("        DAP CollectOwnedParticles ", dapOwnedParticleCollection, maximumNumberOfDigits,
-                               dapSynchronization);
-    std::cout << timerToString("        DAP HaloExchange          ", dapHaloExchange, maximumNumberOfDigits,
-                               dapSynchronization);
-    std::cout << timerToString("        DAP AddHaloParticles      ", dapAddHaloParticles, maximumNumberOfDigits,
-                               dapSynchronization);
-#ifdef DAP_ENABLE_DETAILED_TIMERS
-    std::cout << timerToString("          DAP MigrationClassify   ", dapMigrationClassification, maximumNumberOfDigits,
-                               dapMigration);
-    std::cout << timerToString("          DAP HaloInitialCopy     ", dapHaloInitialCopy, maximumNumberOfDigits,
-                               dapHaloExchange);
-    std::cout << timerToString("          DAP HaloSelection       ", dapHaloSelection, maximumNumberOfDigits,
-                               dapHaloExchange);
-    std::cout << timerToString("          DAP HaloPeriodicShift   ", dapHaloPeriodicShift, maximumNumberOfDigits,
-                               dapHaloExchange);
-    std::cout << timerToString("          DAP HaloBufferInsertion ", dapHaloBufferInsertion, maximumNumberOfDigits,
-                               dapHaloExchange);
-    const long dapCommunicationTotal = dapMigration + dapHaloExchange;
-    std::cout << timerToString("          DAP CommunicationPack   ", dapCommunicationPack, maximumNumberOfDigits,
-                               dapCommunicationTotal);
-    std::cout << timerToString("          DAP CountExchange       ", dapCommunicationCountExchange,
-                               maximumNumberOfDigits, dapCommunicationTotal);
-    std::cout << timerToString("          DAP PayloadWait         ", dapCommunicationPayloadWait, maximumNumberOfDigits,
-                               dapCommunicationTotal);
-    std::cout << timerToString("          DAP CommunicationUnpack ", dapCommunicationUnpack, maximumNumberOfDigits,
-                               dapCommunicationTotal);
+#ifdef AUTOPASDM_ENABLE_TIMERS
+    std::cout << timerToString("      AutoPasDM CoreSynchronization     ", autoPasDMSynchronization,
+                               maximumNumberOfDigits, distributedSynchronization);
+    std::cout << timerToString("        AutoPasDM UpdateContainer       ", autoPasDMUpdateContainer,
+                               maximumNumberOfDigits, autoPasDMSynchronization);
+    std::cout << timerToString("        AutoPasDM LoadBalancing         ", autoPasDMLoadBalancing,
+                               maximumNumberOfDigits, autoPasDMSynchronization);
+    std::cout << timerToString("        AutoPasDM BoundarySync          ", autoPasDMBoundarySynchronization,
+                               maximumNumberOfDigits, autoPasDMSynchronization);
+    std::cout << timerToString("        AutoPasDM ResizeBox             ", autoPasDMResizeBox, maximumNumberOfDigits,
+                               autoPasDMSynchronization);
+    std::cout << timerToString("        AutoPasDM Migration             ", autoPasDMMigration, maximumNumberOfDigits,
+                               autoPasDMSynchronization);
+    std::cout << timerToString("        AutoPasDM AddMigratedParticles  ", autoPasDMAddMigratedParticles,
+                               maximumNumberOfDigits, autoPasDMSynchronization);
+    std::cout << timerToString("        AutoPasDM CollectOwnedParticles ", autoPasDMOwnedParticleCollection,
+                               maximumNumberOfDigits, autoPasDMSynchronization);
+    std::cout << timerToString("        AutoPasDM HaloExchange          ", autoPasDMHaloExchange, maximumNumberOfDigits,
+                               autoPasDMSynchronization);
+    std::cout << timerToString("        AutoPasDM AddHaloParticles      ", autoPasDMAddHaloParticles,
+                               maximumNumberOfDigits, autoPasDMSynchronization);
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
+    std::cout << timerToString("          AutoPasDM MigrationClassify   ", autoPasDMMigrationClassification,
+                               maximumNumberOfDigits, autoPasDMMigration);
+    std::cout << timerToString("          AutoPasDM HaloInitialCopy     ", autoPasDMHaloInitialCopy,
+                               maximumNumberOfDigits, autoPasDMHaloExchange);
+    std::cout << timerToString("          AutoPasDM HaloSelection       ", autoPasDMHaloSelection,
+                               maximumNumberOfDigits, autoPasDMHaloExchange);
+    std::cout << timerToString("          AutoPasDM HaloPeriodicShift   ", autoPasDMHaloPeriodicShift,
+                               maximumNumberOfDigits, autoPasDMHaloExchange);
+    std::cout << timerToString("          AutoPasDM HaloBufferInsertion ", autoPasDMHaloBufferInsertion,
+                               maximumNumberOfDigits, autoPasDMHaloExchange);
+    const long autoPasDMCommunicationTotal = autoPasDMMigration + autoPasDMHaloExchange;
+    std::cout << timerToString("          AutoPasDM CommunicationPack   ", autoPasDMCommunicationPack,
+                               maximumNumberOfDigits, autoPasDMCommunicationTotal);
+    std::cout << timerToString("          AutoPasDM CountExchange       ", autoPasDMCommunicationCountExchange,
+                               maximumNumberOfDigits, autoPasDMCommunicationTotal);
+    std::cout << timerToString("          AutoPasDM PayloadWait         ", autoPasDMCommunicationPayloadWait,
+                               maximumNumberOfDigits, autoPasDMCommunicationTotal);
+    std::cout << timerToString("          AutoPasDM CommunicationUnpack ", autoPasDMCommunicationUnpack,
+                               maximumNumberOfDigits, autoPasDMCommunicationTotal);
 #endif
 #endif
     std::cout << timerToString("  One iteration                 ", simulate / static_cast<long>(_iteration),
@@ -764,11 +767,11 @@ void Simulation::logMeasurements() {
               << (static_cast<double>(_numTuningIterations) / static_cast<double>(_iteration) * 100.) << "%"
               << "\n";
 
-    auto mfups = static_cast<double>(_distributedAutoPasContainer->getLocalNumberOfOwnedParticles() * _iteration) *
-                 1e-6 / (static_cast<double>(forceUpdateTotal) * 1e-9);  // 1e-9 for ns to s, 1e-6 for M in MFUPs
+    auto mfups = static_cast<double>(_autoPasDMContainer->getLocalNumberOfOwnedParticles() * _iteration) * 1e-6 /
+                 (static_cast<double>(forceUpdateTotal) * 1e-9);  // 1e-9 for ns to s, 1e-6 for M in MFUPs
     std::cout << "MFUPs/sec                          : " << mfups << "\n";
-#ifdef DAP_ENABLE_DETAILED_TIMERS
-    std::cout << "DistributedAutoPas communication counters (sum over ranks):\n";
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
+    std::cout << "AutoPasDM communication counters (sum over ranks):\n";
     std::cout << "  Migration particles sent        : " << migrationParticlesSent << "\n";
     std::cout << "  Migration particles received    : " << migrationParticlesReceived << "\n";
     std::cout << "  Halo particles sent             : " << haloParticlesSent << "\n";
@@ -777,8 +780,8 @@ void Simulation::logMeasurements() {
     std::cout << "  Payload bytes received          : " << communicationBytesReceived << "\n";
 #endif
 #ifdef AUTOPAS_ENABLE_DYNAMIC_CONTAINERS
-    std::cout << "Mean Rebuild Frequency               : "
-              << _distributedAutoPasContainer->getMeanLocalRebuildFrequency() << "\n";
+    std::cout << "Mean Rebuild Frequency               : " << _autoPasDMContainer->getMeanLocalRebuildFrequency()
+              << "\n";
 #endif
 #ifdef AUTOPAS_ENABLE_ENERGY_MEASUREMENTS
     std::cout << "Total Energy Consumed (in Joules)    : " << totalEnergy << "\n";
@@ -798,11 +801,10 @@ void Simulation::checkNumParticles(size_t expectedNumParticlesGlobal, size_t num
                            boundary == options::BoundaryTypeOption::reflective;
                   })) {
     const auto numParticlesNowTotal =
-        _distributedAutoPasContainer->globalSum(_distributedAutoPasContainer->getLocalNumberOfOwnedParticles());
-    const auto numParticlesMigratingTotal =
-        _distributedAutoPasContainer->globalSum(numParticlesCurrentlyMigratingLocal);
+        _autoPasDMContainer->globalSum(_autoPasDMContainer->getLocalNumberOfOwnedParticles());
+    const auto numParticlesMigratingTotal = _autoPasDMContainer->globalSum(numParticlesCurrentlyMigratingLocal);
     if (expectedNumParticlesGlobal != numParticlesNowTotal + numParticlesMigratingTotal) {
-      const auto myRank = _distributedAutoPasContainer->rank();
+      const auto myRank = _autoPasDMContainer->rank();
       std::stringstream ss;
       // clang-format off
       ss << "Rank " << myRank << " Line " << lineNumber
@@ -826,27 +828,27 @@ void Simulation::loadParticles() {
   // match the current rank count, every rank contributes its own piece.
   size_t numParticlesInConfigGlobal{};
   if (_configuration.checkpointfile.value.empty()) {
-    _distributedAutoPasContainer->addParticlesFromRoot(_configuration.particles);
-    numParticlesInConfigGlobal = _distributedAutoPasContainer->globalSum(
-        _distributedAutoPasContainer->isRoot() ? numParticlesInConfigLocally : size_t{0});
+    _autoPasDMContainer->addParticlesFromRoot(_configuration.particles);
+    numParticlesInConfigGlobal =
+        _autoPasDMContainer->globalSum(_autoPasDMContainer->isRoot() ? numParticlesInConfigLocally : size_t{0});
   } else {
-    _distributedAutoPasContainer->addDistributedParticles(_configuration.particles);
-    numParticlesInConfigGlobal = _distributedAutoPasContainer->globalSum(numParticlesInConfigLocally);
+    _autoPasDMContainer->addDistributedParticles(_configuration.particles);
+    numParticlesInConfigGlobal = _autoPasDMContainer->globalSum(numParticlesInConfigLocally);
   }
   _configuration.flushParticles();
 
   // Output and sanity checks
-  const auto rank = _distributedAutoPasContainer->rank();
-  const auto numberOfRanks = _distributedAutoPasContainer->numberOfRanks();
-  const size_t numParticlesLocally = _distributedAutoPasContainer->getLocalNumberOfOwnedParticles();
+  const auto rank = _autoPasDMContainer->rank();
+  const auto numberOfRanks = _autoPasDMContainer->numberOfRanks();
+  const size_t numParticlesLocally = _autoPasDMContainer->getLocalNumberOfOwnedParticles();
   std::cout << "Number of particles at initialization "
             // align outputs based on the max number of ranks
             << "on rank " << std::setw(std::to_string(numberOfRanks).length()) << std::right << rank << ": "
             << numParticlesLocally << "\n";
 
-  const auto numParticlesAddedGlobal = _distributedAutoPasContainer->globalSum(numParticlesLocally);
+  const auto numParticlesAddedGlobal = _autoPasDMContainer->globalSum(numParticlesLocally);
 
-  if (_distributedAutoPasContainer->isRoot()) {
+  if (_autoPasDMContainer->isRoot()) {
     std::cout << "Number of particles at initialization globally" << std::setw(std::to_string(numberOfRanks).length())
               << ""
               << ": " << numParticlesAddedGlobal << "\n";
@@ -854,7 +856,7 @@ void Simulation::loadParticles() {
     if (numParticlesAddedGlobal != numParticlesInConfigGlobal) {
       throw std::runtime_error(
           "Simulation::loadParticles(): "
-          "Not all particles from the configuration file could be added to DistributedAutoPas!\n"
+          "Not all particles from the configuration file could be added to AutoPasDM!\n"
           "Configuration : " +
           std::to_string(numParticlesInConfigGlobal) +
           "\n"

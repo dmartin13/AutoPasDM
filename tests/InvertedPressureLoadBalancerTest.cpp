@@ -3,8 +3,8 @@
 
 #include <array>
 
-#include "distributed_autopas/DomainDecomposition.h"
-#include "distributed_autopas/load_balancing/InvertedPressureLoadBalancer.h"
+#include "autopasdm/DomainDecomposition.h"
+#include "autopasdm/load_balancing/InvertedPressureLoadBalancer.h"
 
 namespace {
 
@@ -16,8 +16,9 @@ TEST(InvertedPressureLoadBalancerTest, AveragesWorkAcrossPlanesAndMovesSharedBou
 
   ASSERT_EQ(size, 8);
 
-  dap::DomainDecomposition domain(rank, size, {0., 0., 0.}, {10., 10., 10.}, std::array<bool, 3>{true, true, true});
-  dap::load_balancing::InvertedPressureLoadBalancer loadBalancer(MPI_COMM_WORLD, domain);
+  autopasdm::DomainDecomposition domain(rank, size, {0., 0., 0.}, {10., 10., 10.},
+                                        std::array<bool, 3>{true, true, true});
+  autopasdm::load_balancing::InvertedPressureLoadBalancer loadBalancer(MPI_COMM_WORLD, domain);
 
   const auto coordinates = domain.coordinates();
   const double xPlaneBaseWork = coordinates[0] == 0 ? 4. : 2.;
@@ -51,8 +52,9 @@ TEST(InvertedPressureLoadBalancerTest, EnforcesMinimumWidthBeforeApplyingDampedS
 
   ASSERT_EQ(size, 2);
 
-  dap::DomainDecomposition domain(rank, size, {0., 0., 0.}, {10., 10., 10.}, std::array<bool, 3>{true, false, false});
-  dap::load_balancing::InvertedPressureLoadBalancer loadBalancer(MPI_COMM_WORLD, domain);
+  autopasdm::DomainDecomposition domain(rank, size, {0., 0., 0.}, {10., 10., 10.},
+                                        std::array<bool, 3>{true, false, false});
+  autopasdm::load_balancing::InvertedPressureLoadBalancer loadBalancer(MPI_COMM_WORLD, domain);
 
   const double localWork = domain.coordinates()[0] == 0 ? 99. : 1.;
   const auto balancedBox = loadBalancer.balance(localWork, domain, 2.);

@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-#include "distributed_autopas/BoundaryType.h"
+#include "autopasdm/BoundaryType.h"
 #include "src/ReflectiveBoundary.h"
 
 namespace {
@@ -53,8 +53,8 @@ class TestContainer {
   std::array<double, 3> globalMax{8., 8., 8.};
   std::array<double, 3> localMin{0., 0., 0.};
   std::array<double, 3> localMax{8., 8., 8.};
-  std::array<dap::BoundaryType, 3> boundaries{dap::BoundaryType::none, dap::BoundaryType::none,
-                                              dap::BoundaryType::none};
+  std::array<autopasdm::BoundaryType, 3> boundaries{autopasdm::BoundaryType::none, autopasdm::BoundaryType::none,
+                                                    autopasdm::BoundaryType::none};
   std::vector<TestParticle> particles;
   std::size_t particlesVisitedByRegionOperations{};
 
@@ -82,7 +82,8 @@ class TestContainer {
 
 TEST(ReflectiveBoundaryTest, AppliesRepulsiveForceAtLowerAndUpperWalls) {
   TestContainer container;
-  container.boundaries = {dap::BoundaryType::reflective, dap::BoundaryType::reflective, dap::BoundaryType::none};
+  container.boundaries = {autopasdm::BoundaryType::reflective, autopasdm::BoundaryType::reflective,
+                          autopasdm::BoundaryType::none};
   container.particles = {{{0.5, 4., 4.}, {}, 0}, {{4., 7.5, 4.}, {}, 0}};
   TestParticlePropertiesLibrary particlePropertiesLibrary({1.});
 
@@ -99,7 +100,8 @@ TEST(ReflectiveBoundaryTest, AppliesRepulsiveForceAtLowerAndUpperWalls) {
 
 TEST(ReflectiveBoundaryTest, AppliesIndependentForcesAtReflectiveCorner) {
   TestContainer container;
-  container.boundaries = {dap::BoundaryType::reflective, dap::BoundaryType::reflective, dap::BoundaryType::reflective};
+  container.boundaries = {autopasdm::BoundaryType::reflective, autopasdm::BoundaryType::reflective,
+                          autopasdm::BoundaryType::reflective};
   container.particles = {{{0.5, 0.5, 0.5}, {}, 0}};
   TestParticlePropertiesLibrary particlePropertiesLibrary({1.});
 
@@ -112,7 +114,8 @@ TEST(ReflectiveBoundaryTest, AppliesIndependentForcesAtReflectiveCorner) {
 
 TEST(ReflectiveBoundaryTest, OnlyActsInsideRepulsiveLennardJonesRange) {
   TestContainer container;
-  container.boundaries = {dap::BoundaryType::reflective, dap::BoundaryType::none, dap::BoundaryType::none};
+  container.boundaries = {autopasdm::BoundaryType::reflective, autopasdm::BoundaryType::none,
+                          autopasdm::BoundaryType::none};
   container.particles = {{{0.55, 4., 4.}, {}, 0}, {{0.55, 5., 5.}, {}, 1}};
   TestParticlePropertiesLibrary particlePropertiesLibrary({1., 0.5});
 
@@ -124,7 +127,8 @@ TEST(ReflectiveBoundaryTest, OnlyActsInsideRepulsiveLennardJonesRange) {
 
 TEST(ReflectiveBoundaryTest, IgnoresNoneAndPeriodicBoundaries) {
   TestContainer container;
-  container.boundaries = {dap::BoundaryType::periodic, dap::BoundaryType::none, dap::BoundaryType::none};
+  container.boundaries = {autopasdm::BoundaryType::periodic, autopasdm::BoundaryType::none,
+                          autopasdm::BoundaryType::none};
   container.particles = {{{0.5, 4., 4.}, {}, 0}};
   TestParticlePropertiesLibrary particlePropertiesLibrary({1.});
 
@@ -135,7 +139,8 @@ TEST(ReflectiveBoundaryTest, IgnoresNoneAndPeriodicBoundaries) {
 
 TEST(ReflectiveBoundaryTest, OnlyRunsOnRanksTouchingTheGlobalReflectiveWall) {
   TestContainer container;
-  container.boundaries = {dap::BoundaryType::reflective, dap::BoundaryType::none, dap::BoundaryType::none};
+  container.boundaries = {autopasdm::BoundaryType::reflective, autopasdm::BoundaryType::none,
+                          autopasdm::BoundaryType::none};
   container.localMin = {2., 0., 0.};
   container.localMax = {4., 8., 8.};
   container.particles = {{{2.1, 4., 4.}, {}, 0}};
@@ -149,7 +154,8 @@ TEST(ReflectiveBoundaryTest, OnlyRunsOnRanksTouchingTheGlobalReflectiveWall) {
 
 TEST(ReflectiveBoundaryTest, RestrictsTraversalToReflectiveWallRegions) {
   TestContainer container;
-  container.boundaries = {dap::BoundaryType::reflective, dap::BoundaryType::none, dap::BoundaryType::none};
+  container.boundaries = {autopasdm::BoundaryType::reflective, autopasdm::BoundaryType::none,
+                          autopasdm::BoundaryType::none};
   container.particles = {{{0.5, 4., 4.}, {}, 0}, {{4., 4., 4.}, {}, 0}, {{7.5, 4., 4.}, {}, 0}};
   TestParticlePropertiesLibrary particlePropertiesLibrary({1.});
 

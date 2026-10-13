@@ -4,24 +4,24 @@
 #include <thread>
 #include <type_traits>
 
-#include "distributed_autopas/PerformanceCounters.h"
+#include "autopasdm/PerformanceCounters.h"
 
 TEST(PerformanceCountersTest, SnapshotStartsAtZeroAndCanBeReset) {
-  dap::performance::PerformanceCounters performanceCounters;
+  autopasdm::performance::PerformanceCounters performanceCounters;
 
   const auto initialSnapshot = performanceCounters.snapshot();
   EXPECT_EQ(initialSnapshot.synchronizationNs, 0);
   EXPECT_EQ(initialSnapshot.updateContainerNs, 0);
   EXPECT_EQ(initialSnapshot.communicationBytesSent, 0);
 
-#ifdef DAP_ENABLE_TIMERS
+#ifdef AUTOPASDM_ENABLE_TIMERS
   performanceCounters.updateContainer.start();
   std::this_thread::sleep_for(std::chrono::milliseconds(1));
   performanceCounters.updateContainer.stop();
   EXPECT_GT(performanceCounters.snapshot().updateContainerNs, 0);
 #endif
 
-#ifdef DAP_ENABLE_DETAILED_TIMERS
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
   performanceCounters.haloInitialCopy.start();
   std::this_thread::sleep_for(std::chrono::milliseconds(1));
   performanceCounters.haloInitialCopy.stop();
@@ -46,9 +46,9 @@ TEST(PerformanceCountersTest, SnapshotStartsAtZeroAndCanBeReset) {
   EXPECT_EQ(resetSnapshot.communicationBytesSent, 0);
 }
 
-#ifndef DAP_ENABLE_TIMERS
+#ifndef AUTOPASDM_ENABLE_TIMERS
 TEST(PerformanceCountersTest, DisabledPerformanceCountersHaveNoStorage) {
-  static_assert(std::is_empty_v<dap::performance::PerformanceCounters>);
+  static_assert(std::is_empty_v<autopasdm::performance::PerformanceCounters>);
   SUCCEED();
 }
 #endif

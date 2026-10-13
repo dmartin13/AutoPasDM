@@ -7,12 +7,12 @@
 #include <stdexcept>
 #include <vector>
 
-#include "distributed_autopas/Communication.h"
-#include "distributed_autopas/Particle.h"
+#include "autopasdm/Communication.h"
+#include "autopasdm/Particle.h"
 
 namespace {
 
-using Particle = dap::Particle;
+using Particle = autopasdm::Particle;
 
 Particle makeParticle(unsigned long id, double marker) {
   Particle particle;
@@ -44,7 +44,7 @@ TEST(CommunicationTest, ExchangesParticlesWithLeftAndRightNeighbors) {
   const std::vector<Particle> sendLeft{makeParticle(100 + rank, leftMarker)};
   const std::vector<Particle> sendRight{makeParticle(200 + rank, rightMarker)};
 
-  const auto received = dap::exchangeLeftRight(MPI_COMM_WORLD, left, right, sendLeft, sendRight, 1000);
+  const auto received = autopasdm::exchangeLeftRight(MPI_COMM_WORLD, left, right, sendLeft, sendRight, 1000);
 
   ASSERT_EQ(received.recvFromLeft.size(), 1);
   ASSERT_EQ(received.recvFromRight.size(), 1);
@@ -67,7 +67,7 @@ TEST(CommunicationTest, SupportsSplitBeginFinishNeighborExchange) {
   const std::vector<Particle> sendLeft{makeParticle(500 + rank, 50. + rank)};
   const std::vector<Particle> sendRight{makeParticle(600 + rank, 60. + rank)};
 
-  auto request = dap::beginLeftRightExchange(MPI_COMM_WORLD, left, right, sendLeft, sendRight, 1500);
+  auto request = autopasdm::beginLeftRightExchange(MPI_COMM_WORLD, left, right, sendLeft, sendRight, 1500);
   EXPECT_TRUE(request.active());
 
   // The split API deliberately leaves the payload exchange in flight here so
@@ -75,7 +75,7 @@ TEST(CommunicationTest, SupportsSplitBeginFinishNeighborExchange) {
   const auto localWork = rank * rank;
   EXPECT_GE(localWork, 0);
 
-  const auto received = dap::finishLeftRightExchange(request);
+  const auto received = autopasdm::finishLeftRightExchange(request);
   EXPECT_FALSE(request.active());
 
   ASSERT_EQ(received.recvFromLeft.size(), 1);
@@ -83,7 +83,7 @@ TEST(CommunicationTest, SupportsSplitBeginFinishNeighborExchange) {
   expectParticleEquals(received.recvFromLeft.front(), 600 + left, 60. + left);
   expectParticleEquals(received.recvFromRight.front(), 500 + right, 50. + right);
 
-  EXPECT_THROW((void)dap::finishLeftRightExchange(request), std::logic_error);
+  EXPECT_THROW((void)autopasdm::finishLeftRightExchange(request), std::logic_error);
 }
 
 TEST(CommunicationTest, SplitExchangeSupportsMissingNeighbors) {
@@ -100,8 +100,8 @@ TEST(CommunicationTest, SplitExchangeSupportsMissingNeighbors) {
   const std::vector<Particle> sendLeft{makeParticle(700 + rank, 70. + rank)};
   const std::vector<Particle> sendRight{makeParticle(800 + rank, 80. + rank)};
 
-  auto request = dap::beginLeftRightExchange(MPI_COMM_WORLD, left, right, sendLeft, sendRight, 1750);
-  const auto received = dap::finishLeftRightExchange(request);
+  auto request = autopasdm::beginLeftRightExchange(MPI_COMM_WORLD, left, right, sendLeft, sendRight, 1750);
+  const auto received = autopasdm::finishLeftRightExchange(request);
 
   const std::size_t expectedFromLeft = left < 0 ? 0 : 1;
   const std::size_t expectedFromRight = right < 0 ? 0 : 1;
@@ -135,7 +135,7 @@ TEST(CommunicationTest, SupportsEmptyNeighborBuffers) {
     sendRight.push_back(makeParticle(400 + rank, 40. + rank));
   }
 
-  const auto received = dap::exchangeLeftRight(MPI_COMM_WORLD, left, right, sendLeft, sendRight, 2000);
+  const auto received = autopasdm::exchangeLeftRight(MPI_COMM_WORLD, left, right, sendLeft, sendRight, 2000);
 
   const std::size_t expectedFromLeft = left % 2 == 1 ? 1 : 0;
   const std::size_t expectedFromRight = right % 2 == 0 ? 1 : 0;
@@ -166,7 +166,7 @@ TEST(CommunicationTest, ExchangesParticlesWithArbitraryDestinationRanks) {
     particlesByDestination[destination].push_back(makeParticle(id, marker));
   }
 
-  auto received = dap::exchangeParticlesByRank(MPI_COMM_WORLD, particlesByDestination);
+  auto received = autopasdm::exchangeParticlesByRank(MPI_COMM_WORLD, particlesByDestination);
   ASSERT_EQ(received.size(), static_cast<std::size_t>(numberOfRanks));
 
   std::sort(received.begin(), received.end(), [](const auto &a, const auto &b) { return a.getID() < b.getID(); });
@@ -185,7 +185,7 @@ TEST(CommunicationTest, RejectsWrongNumberOfDestinationBuffers) {
   ASSERT_EQ(numberOfRanks, 4);
 
   std::vector<std::vector<Particle>> particlesByDestination(numberOfRanks - 1);
-  EXPECT_THROW(dap::exchangeParticlesByRank(MPI_COMM_WORLD, particlesByDestination), std::invalid_argument);
+  EXPECT_THROW(autopasdm::exchangeParticlesByRank(MPI_COMM_WORLD, particlesByDestination), std::invalid_argument);
 }
 
 }  // namespace

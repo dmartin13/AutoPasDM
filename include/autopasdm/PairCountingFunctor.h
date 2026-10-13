@@ -9,13 +9,13 @@
 
 #include "autopas/baseFunctors/PairwiseFunctor.h"
 
-namespace dap {
+namespace autopasdm {
 
 /**
  * Small AoS-only test functor that counts interacting particle pairs.
  *
  * This is an ordinary AutoPas functor. It is templated only so the same interaction test also verifies that
- * DistributedAutoPas is no longer tied to one concrete particle type.
+ * AutoPasDM is no longer tied to one concrete particle type.
  *
  * @tparam Particle AutoPas-compatible particle type used by the test.
  */
@@ -167,4 +167,4 @@ class PairCountingFunctor : public autopas::PairwiseFunctor<Particle, PairCounti
   std::vector<std::pair<unsigned long, unsigned long>> _ownedHaloPairs;
 };
 
-}  // namespace dap
+}  // namespace autopasdm

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark original md-flexible against the DistributedAutoPas integration.
+"""Benchmark original md-flexible against the AutoPasDM integration.
 
 The runner executes the same fixed md-flexible configuration several times and reports
 medians for wall-clock, simulation, force, and distributed-synchronization time.
@@ -8,14 +8,14 @@ For the reference implementation, synchronization is reconstructed from md-flexi
 existing accumulated timers:
   UpdateContainer + LoadBalancing + MigratingParticleExchange + HaloParticleExchange
 
-For the DistributedAutoPas implementation, the integration exposes one aggregated
+For the AutoPasDM implementation, the integration exposes one aggregated
 DistributedSynchronization timer because these operations are intentionally encapsulated.
 
 Example:
     python3 scripts/run_performance_baseline.py \
         --reference /path/to/AutoPas/build/examples/md-flexible/md-flexible \
         --distributed ./md-flexible \
-        --config input/dap_performance_baseline.yaml \
+        --config input/autopasdm_performance_baseline.yaml \
         --ranks 8 \
         --repetitions 5
 
@@ -54,7 +54,7 @@ class RunResult:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reference", required=True, type=Path, help="Original MPI-enabled md-flexible executable")
-    parser.add_argument("--distributed", required=True, type=Path, help="DistributedAutoPas md-flexible executable")
+    parser.add_argument("--distributed", required=True, type=Path, help="AutoPasDM md-flexible executable")
     parser.add_argument("--config", required=True, type=Path, help="YAML input shared by both implementations")
     parser.add_argument("--ranks", type=int, default=8, help="MPI ranks (default: 8)")
     parser.add_argument("--repetitions", type=int, default=5, help="Measured repetitions per implementation (default: 5)")
@@ -171,20 +171,20 @@ def print_summary(reference: list[RunResult], distributed: list[RunResult], rank
     print(f"  MPI ranks: {ranks}")
     print(f"  measured repetitions: {len(reference)}")
     print()
-    print(f"  {'metric':28s} {'reference [s]':>15s} {'distributed [s]':>17s} {'ref/dap':>10s}")
+    print(f"  {'metric':28s} {'reference [s]':>15s} {'distributed [s]':>17s} {'ref/autopasdm':>10s}")
     print(f"  {'-' * 28} {'-' * 15} {'-' * 17} {'-' * 10}")
 
     for label, attribute, accumulated in metrics:
         ref = median(reference, attribute)
-        dap = median(distributed, attribute)
+        autopasdm = median(distributed, attribute)
         if accumulated:
             ref /= ranks
-            dap /= ranks
-        ratio = ref / dap if dap > 0 else float("inf")
-        print(f"  {label:28s} {ref:15.6f} {dap:17.6f} {ratio:10.3f}")
+            autopasdm /= ranks
+        ratio = ref / autopasdm if autopasdm > 0 else float("inf")
+        print(f"  {label:28s} {ref:15.6f} {autopasdm:17.6f} {ratio:10.3f}")
 
     print("\nNotes:")
-    print("  ref/dap > 1 means DistributedAutoPas was faster for that metric.")
+    print("  ref/autopasdm > 1 means AutoPasDM was faster for that metric.")
     print("  '/ rank' metrics are accumulated MPI-rank timers divided by the number of ranks.")
     print("  Reference synchronization = updateContainer + load balancing + migration + halo exchange.")
     print("  Distributed synchronization is the aggregated prepareInteractions() phase.")
@@ -240,7 +240,7 @@ def main() -> int:
         root.mkdir(parents=True, exist_ok=True)
         temporary = None
     else:
-        temporary = tempfile.TemporaryDirectory(prefix="dap_performance_baseline_")
+        temporary = tempfile.TemporaryDirectory(prefix="autopasdm_performance_baseline_")
         root = Path(temporary.name)
 
     implementations = {

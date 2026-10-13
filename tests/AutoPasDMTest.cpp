@@ -9,13 +9,13 @@
 #include "autopas/options/DataLayoutOption.h"
 #include "autopas/options/Newton3Option.h"
 #include "autopas/options/TraversalOption.h"
-#include "distributed_autopas/DistributedAutoPas.h"
-#include "distributed_autopas/Particle.h"
-#include "distributed_autopas/Runtime.h"
+#include "autopasdm/AutoPasDM.h"
+#include "autopasdm/Particle.h"
+#include "autopasdm/Runtime.h"
 
 namespace {
 
-using Particle = dap::Particle;
+using Particle = autopasdm::Particle;
 
 constexpr std::array<double, 3> globalMin{0., 0., 0.};
 constexpr std::array<double, 3> globalMax{4., 1., 1.};
@@ -38,7 +38,7 @@ auto makeConfigurator() {
   };
 }
 
-std::vector<unsigned long> ownedIds(const dap::DistributedAutoPas<Particle> &particles) {
+std::vector<unsigned long> ownedIds(const autopasdm::AutoPasDM<Particle> &particles) {
   std::vector<unsigned long> ids;
   particles.forEachOwnedParticle([&](const auto &particle) { ids.push_back(particle.getID()); });
   std::sort(ids.begin(), ids.end());
@@ -65,13 +65,13 @@ std::vector<Particle> makeForceTestParticles() {
 void expectForceTestResult(int expectedNumberOfRanks, bool explicitPreparation = false) {
   int argc = 0;
   char **argv = nullptr;
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
   ASSERT_EQ(runtime.size(), expectedNumberOfRanks);
 
-  dap::DistributedAutoPas<Particle> particles(runtime, forceGlobalMin, forceGlobalMax, forceCutoff, makeConfigurator());
+  autopasdm::AutoPasDM<Particle> particles(runtime, forceGlobalMin, forceGlobalMax, forceCutoff, makeConfigurator());
   particles.addParticlesFromRoot(makeForceTestParticles());
 
-  dap::testing::TestForceFunctor<Particle> functor(forceCutoff);
+  autopasdm::testing::TestForceFunctor<Particle> functor(forceCutoff);
   if (explicitPreparation) {
     particles.prepareInteractions();
     particles.computeInteractionsPrepared(&functor);
@@ -98,13 +98,13 @@ void expectForceTestResult(int expectedNumberOfRanks, bool explicitPreparation =
   particles.finalize();
 }
 
-TEST(DistributedAutoPasTest, AddsReplicatedInputFromRootExactlyOnce) {
+TEST(AutoPasDMTest, AddsReplicatedInputFromRootExactlyOnce) {
   int argc = 0;
   char **argv = nullptr;
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
   ASSERT_EQ(runtime.size(), 4);
 
-  dap::DistributedAutoPas<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
+  autopasdm::AutoPasDM<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
 
   std::vector<Particle> replicatedInput;
   for (unsigned long id = 0; id < 8; ++id) {
@@ -126,13 +126,13 @@ TEST(DistributedAutoPasTest, AddsReplicatedInputFromRootExactlyOnce) {
   particles.finalize();
 }
 
-TEST(DistributedAutoPasTest, RedistributesContributionsFromAllRanksToTheirOwners) {
+TEST(AutoPasDMTest, RedistributesContributionsFromAllRanksToTheirOwners) {
   int argc = 0;
   char **argv = nullptr;
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
   ASSERT_EQ(runtime.size(), 4);
 
-  dap::DistributedAutoPas<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
+  autopasdm::AutoPasDM<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
 
   const auto rank = runtime.rank();
   const auto rightRank = (rank + 1) % runtime.size();
@@ -158,17 +158,17 @@ TEST(DistributedAutoPasTest, RedistributesContributionsFromAllRanksToTheirOwners
   particles.finalize();
 }
 
-TEST(DistributedAutoPasTest, UsesThreeDimensionalProcessGridForInitialOwnership) {
+TEST(AutoPasDMTest, UsesThreeDimensionalProcessGridForInitialOwnership) {
   int argc = 0;
   char **argv = nullptr;
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
   ASSERT_EQ(runtime.size(), 8);
 
   constexpr std::array<double, 3> boxMin{0., 0., 0.};
   constexpr std::array<double, 3> boxMax{4., 4., 4.};
   constexpr std::array<bool, 3> subdivideDimensions{true, true, true};
 
-  dap::DistributedAutoPas<Particle> particles(runtime, boxMin, boxMax, cutoff, subdivideDimensions, makeConfigurator());
+  autopasdm::AutoPasDM<Particle> particles(runtime, boxMin, boxMax, cutoff, subdivideDimensions, makeConfigurator());
 
   std::vector<Particle> replicatedInput;
   for (int x = 0; x < 2; ++x) {
@@ -200,13 +200,13 @@ TEST(DistributedAutoPasTest, UsesThreeDimensionalProcessGridForInitialOwnership)
   particles.finalize();
 }
 
-TEST(DistributedAutoPasTest, ResizesLocalBoxAndMigratesParticles) {
+TEST(AutoPasDMTest, ResizesLocalBoxAndMigratesParticles) {
   int argc = 0;
   char **argv = nullptr;
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
   ASSERT_EQ(runtime.size(), 4);
 
-  dap::DistributedAutoPas<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
+  autopasdm::AutoPasDM<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
 
   particles.addParticlesFromRoot(std::vector<Particle>{
       makeParticle(0, 0.9),
@@ -251,13 +251,13 @@ TEST(DistributedAutoPasTest, ResizesLocalBoxAndMigratesParticles) {
   particles.finalize();
 }
 
-TEST(DistributedAutoPasTest, AppliesInvertedPressureLoadBalancingAndMigratesParticles) {
+TEST(AutoPasDMTest, AppliesInvertedPressureLoadBalancingAndMigratesParticles) {
   int argc = 0;
   char **argv = nullptr;
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
   ASSERT_EQ(runtime.size(), 2);
 
-  dap::DistributedAutoPas<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
+  autopasdm::AutoPasDM<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
 
   particles.addParticlesFromRoot(std::vector<Particle>{
       makeParticle(0, 0.5),
@@ -286,13 +286,13 @@ TEST(DistributedAutoPasTest, AppliesInvertedPressureLoadBalancingAndMigratesPart
   particles.finalize();
 }
 
-TEST(DistributedAutoPasTest, RedistributesParticlesUsingAdaptiveTargetRanks) {
+TEST(AutoPasDMTest, RedistributesParticlesUsingAdaptiveTargetRanks) {
   int argc = 0;
   char **argv = nullptr;
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
   ASSERT_EQ(runtime.size(), 2);
 
-  dap::DistributedAutoPas<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
+  autopasdm::AutoPasDM<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
 
   // Move the shared boundary from x=2.0 to x=1.5 before inserting particles.
   const double localWork = runtime.rank() == 0 ? 3. : 1.;
@@ -314,13 +314,13 @@ TEST(DistributedAutoPasTest, RedistributesParticlesUsingAdaptiveTargetRanks) {
   particles.finalize();
 }
 
-TEST(DistributedAutoPasTest, AppliesRepeatedInvertedPressureLoadBalancingFromCurrentDomain) {
+TEST(AutoPasDMTest, AppliesRepeatedInvertedPressureLoadBalancingFromCurrentDomain) {
   int argc = 0;
   char **argv = nullptr;
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
   ASSERT_EQ(runtime.size(), 2);
 
-  dap::DistributedAutoPas<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
+  autopasdm::AutoPasDM<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
 
   particles.addParticlesFromRoot(std::vector<Particle>{
       makeParticle(0, 0.5),
@@ -364,10 +364,10 @@ TEST(DistributedAutoPasTest, AppliesRepeatedInvertedPressureLoadBalancingFromCur
   particles.finalize();
 }
 
-TEST(DistributedAutoPasTest, BalancesMigratesAndComputesAcrossAdaptiveThreeDimensionalCorner) {
+TEST(AutoPasDMTest, BalancesMigratesAndComputesAcrossAdaptiveThreeDimensionalCorner) {
   int argc = 0;
   char **argv = nullptr;
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
   ASSERT_EQ(runtime.size(), 8);
 
   constexpr std::array<double, 3> boxMin{0., 0., 0.};
@@ -375,8 +375,8 @@ TEST(DistributedAutoPasTest, BalancesMigratesAndComputesAcrossAdaptiveThreeDimen
   constexpr std::array<bool, 3> subdivideDimensions{true, true, true};
   constexpr double threeDimensionalCutoff = 0.5;
 
-  dap::DistributedAutoPas<Particle> particles(runtime, boxMin, boxMax, threeDimensionalCutoff, subdivideDimensions,
-                                              makeConfigurator());
+  autopasdm::AutoPasDM<Particle> particles(runtime, boxMin, boxMax, threeDimensionalCutoff, subdivideDimensions,
+                                           makeConfigurator());
 
   Particle lowerCornerParticle;
   lowerCornerParticle.setID(8000);
@@ -421,7 +421,7 @@ TEST(DistributedAutoPasTest, BalancesMigratesAndComputesAcrossAdaptiveThreeDimen
   // The particles are now owned by diagonally opposite subdomains and interact
   // across the newly shifted x/y/z corner. A correct force therefore also verifies
   // that halo propagation uses the adaptive box geometry after load balancing.
-  dap::testing::TestForceFunctor<Particle> functor(threeDimensionalCutoff);
+  autopasdm::testing::TestForceFunctor<Particle> functor(threeDimensionalCutoff);
   particles.computeInteractionsPrepared(&functor);
 
   if (rank == 0) {
@@ -443,13 +443,13 @@ TEST(DistributedAutoPasTest, BalancesMigratesAndComputesAcrossAdaptiveThreeDimen
   particles.finalize();
 }
 
-TEST(DistributedAutoPasTest, ReducesDoubleValuesGlobally) {
+TEST(AutoPasDMTest, ReducesDoubleValuesGlobally) {
   int argc = 0;
   char **argv = nullptr;
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
   ASSERT_EQ(runtime.size(), 4);
 
-  dap::DistributedAutoPas<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
+  autopasdm::AutoPasDM<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
 
   const double localValue = 0.25 * static_cast<double>(runtime.rank() + 1);
   EXPECT_DOUBLE_EQ(particles.globalSum(localValue), 2.5);
@@ -457,13 +457,13 @@ TEST(DistributedAutoPasTest, ReducesDoubleValuesGlobally) {
   particles.finalize();
 }
 
-TEST(DistributedAutoPasTest, AppliesKernelOnlyToOwnedParticlesInRegion) {
+TEST(AutoPasDMTest, AppliesKernelOnlyToOwnedParticlesInRegion) {
   int argc = 0;
   char **argv = nullptr;
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
   ASSERT_EQ(runtime.size(), 1);
 
-  dap::DistributedAutoPas<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
+  autopasdm::AutoPasDM<Particle> particles(runtime, globalMin, globalMax, cutoff, makeConfigurator());
 
   auto firstParticle = makeParticle(0, 0.25);
   auto secondParticle = makeParticle(1, 1.25);
@@ -488,10 +488,10 @@ TEST(DistributedAutoPasTest, AppliesKernelOnlyToOwnedParticlesInRegion) {
   particles.finalize();
 }
 
-TEST(DistributedAutoPasTest, ComputesInteractionAcrossThreeDimensionalCorner) {
+TEST(AutoPasDMTest, ComputesInteractionAcrossThreeDimensionalCorner) {
   int argc = 0;
   char **argv = nullptr;
-  dap::Runtime runtime(argc, argv);
+  autopasdm::Runtime runtime(argc, argv);
   ASSERT_EQ(runtime.size(), 8);
 
   constexpr std::array<double, 3> boxMin{0., 0., 0.};
@@ -499,8 +499,8 @@ TEST(DistributedAutoPasTest, ComputesInteractionAcrossThreeDimensionalCorner) {
   constexpr std::array<bool, 3> subdivideDimensions{true, true, true};
   constexpr double threeDimensionalCutoff = 0.5;
 
-  dap::DistributedAutoPas<Particle> particles(runtime, boxMin, boxMax, threeDimensionalCutoff, subdivideDimensions,
-                                              makeConfigurator());
+  autopasdm::AutoPasDM<Particle> particles(runtime, boxMin, boxMax, threeDimensionalCutoff, subdivideDimensions,
+                                           makeConfigurator());
 
   Particle lowerCornerParticle;
   lowerCornerParticle.setID(7000);
@@ -514,7 +514,7 @@ TEST(DistributedAutoPasTest, ComputesInteractionAcrossThreeDimensionalCorner) {
 
   particles.addParticlesFromRoot(std::vector<Particle>{lowerCornerParticle, upperCornerParticle});
 
-  dap::testing::TestForceFunctor<Particle> functor(threeDimensionalCutoff);
+  autopasdm::testing::TestForceFunctor<Particle> functor(threeDimensionalCutoff);
   particles.computeInteractions(&functor);
 
   EXPECT_EQ(particles.getGlobalNumberOfOwnedParticles(), 2);
@@ -542,10 +542,10 @@ TEST(DistributedAutoPasTest, ComputesInteractionAcrossThreeDimensionalCorner) {
   particles.finalize();
 }
 
-TEST(DistributedAutoPasTest, ComputesPeriodicForcesWithSingleRank) { expectForceTestResult(1); }
+TEST(AutoPasDMTest, ComputesPeriodicForcesWithSingleRank) { expectForceTestResult(1); }
 
-TEST(DistributedAutoPasTest, ComputesSamePeriodicForcesAcrossFourRanks) { expectForceTestResult(4); }
+TEST(AutoPasDMTest, ComputesSamePeriodicForcesAcrossFourRanks) { expectForceTestResult(4); }
 
-TEST(DistributedAutoPasTest, ComputesForcesAfterExplicitPreparation) { expectForceTestResult(4, true); }
+TEST(AutoPasDMTest, ComputesForcesAfterExplicitPreparation) { expectForceTestResult(4, true); }
 
 }  // namespace

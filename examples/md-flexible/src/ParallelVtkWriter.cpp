@@ -13,7 +13,7 @@
 #include <utility>
 
 ParallelVtkWriter::ParallelVtkWriter(std::string sessionName, const std::string &outputFolder,
-                                     const int &maximumNumberOfDigitsInIteration, dap::Runtime &runtime)
+                                     const int &maximumNumberOfDigitsInIteration, autopasdm::Runtime &runtime)
     : _numberOfRanks(runtime.size()),
       _rank(runtime.rank()),
       _sessionName(std::move(sessionName)),

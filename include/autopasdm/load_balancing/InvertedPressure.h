@@ -1,6 +1,6 @@
 #pragma once
 
-namespace dap::load_balancing {
+namespace autopasdm::load_balancing {
 
 /**
  * Calculate the balanced position of the shared boundary between two adjacent domains.
@@ -34,4 +34,4 @@ inline double balanceAdjacentDomains(double leftWork, double rightWork, double l
   return balancedPosition;
 }
 
-}  // namespace dap::load_balancing
+}  // namespace autopasdm::load_balancing

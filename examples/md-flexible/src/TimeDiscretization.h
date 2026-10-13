@@ -8,7 +8,7 @@
 #include "TypeDefinitions.h"
 #include "autopas/AutoPasDecl.h"
 #include "autopas/utils/Quaternion.h"
-#include "distributed_autopas/DistributedAutoPas.h"
+#include "autopasdm/AutoPasDM.h"
 #include "src/configuration/MDFlexConfig.h"
 
 /**
@@ -32,14 +32,14 @@ namespace TimeDiscretization {
  * @param fastParticlesThrow When true throws an exception if particles moved too far for verlet technique
  * (>skin/rebuildFrequency/2). Does nothing if dynamic containers are enabled.
  */
-void calculatePositionsAndResetForces(dap::DistributedAutoPas<ParticleType> &container,
+void calculatePositionsAndResetForces(autopasdm::AutoPasDM<ParticleType> &container,
                                       const ParticlePropertiesLibraryType &particlePropertiesLibrary,
                                       const double &deltaT, const std::array<double, 3> &globalForce,
                                       bool fastParticlesThrow);
 
 /**
  * Legacy overload used by the original md-flexible unit tests.
- * Production simulation code should use the DistributedAutoPas overload above.
+ * Production simulation code should use the AutoPasDM overload above.
  */
 void calculatePositionsAndResetForces(autopas::AutoPas<ParticleType> &autoPasContainer,
                                       const ParticlePropertiesLibraryType &particlePropertiesLibrary,
@@ -54,7 +54,7 @@ void calculatePositionsAndResetForces(autopas::AutoPas<ParticleType> &autoPasCon
  *
  * @note Throws error if md-flexible is compiled without multi-site support.
  */
-void calculateQuaternionsAndResetTorques(dap::DistributedAutoPas<ParticleType> &container,
+void calculateQuaternionsAndResetTorques(autopasdm::AutoPasDM<ParticleType> &container,
                                          const ParticlePropertiesLibraryType &particlePropertiesLibrary,
                                          const double &deltaT, const std::array<double, 3> &globalForce);
 
@@ -69,7 +69,7 @@ void calculateQuaternionsAndResetTorques(autopas::AutoPas<ParticleType> &autoPas
  * Specifically
  *      v_{n+1} = v_n + delta_t / (2 * mass) * (F_n + F_{n-1})
  */
-void calculateVelocities(dap::DistributedAutoPas<ParticleType> &container,
+void calculateVelocities(autopasdm::AutoPasDM<ParticleType> &container,
                          const ParticlePropertiesLibraryType &particlePropertiesLibrary, const double &deltaT);
 
 /** Legacy overload used by the original md-flexible unit tests. */
@@ -81,7 +81,7 @@ void calculateVelocities(autopas::AutoPas<ParticleType> &autoPasContainer,
  *
  * @note Throws error if md-flexible is compiled without multi-site support.
  */
-void calculateAngularVelocities(dap::DistributedAutoPas<ParticleType> &container,
+void calculateAngularVelocities(autopasdm::AutoPasDM<ParticleType> &container,
                                 const ParticlePropertiesLibraryType &particlePropertiesLibrary, const double &deltaT);
 
 /** Legacy overload used by the original md-flexible unit tests. */

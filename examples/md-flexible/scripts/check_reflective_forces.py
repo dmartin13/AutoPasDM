@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the expected forces of dap_reflective_compare.yaml."""
+"""Check the expected forces of autopasdm_reflective_compare.yaml."""
 
 import sys
 

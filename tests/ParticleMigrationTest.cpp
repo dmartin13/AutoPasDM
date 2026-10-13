@@ -6,13 +6,13 @@
 #include <string>
 #include <vector>
 
-#include "distributed_autopas/DomainDecomposition.h"
-#include "distributed_autopas/Particle.h"
-#include "distributed_autopas/ParticleMigration.h"
+#include "autopasdm/DomainDecomposition.h"
+#include "autopasdm/Particle.h"
+#include "autopasdm/ParticleMigration.h"
 
 namespace {
 
-using Particle = dap::Particle;
+using Particle = autopasdm::Particle;
 
 constexpr std::array<double, 3> globalMin{0., 0., 0.};
 constexpr std::array<double, 3> globalMax{4., 1., 1.};
@@ -31,30 +31,30 @@ Particle makeParticle(unsigned long id, const std::array<double, 3> &position) {
   return particle;
 }
 
-dap::DomainDecomposition makeDomain(int &rank, int &numberOfRanks) {
+autopasdm::DomainDecomposition makeDomain(int &rank, int &numberOfRanks) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &numberOfRanks);
-  return dap::DomainDecomposition(rank, numberOfRanks, globalMin, globalMax);
+  return autopasdm::DomainDecomposition(rank, numberOfRanks, globalMin, globalMax);
 }
 
 struct TestContext {
   int rank{0};
   int numberOfRanks{0};
-  dap::DomainDecomposition domain;
-  dap::ParticleMigration<Particle> migration;
+  autopasdm::DomainDecomposition domain;
+  autopasdm::ParticleMigration<Particle> migration;
 
   TestContext() : domain(makeDomain(rank, numberOfRanks)), migration(MPI_COMM_WORLD) {}
 };
 
-#ifdef DAP_ENABLE_DETAILED_TIMERS
+#ifdef AUTOPASDM_ENABLE_DETAILED_TIMERS
 TEST(ParticleMigrationTest, SkipsNeighborExchangeWhenNoRankHasEmigrants) {
   int rank = 0;
   int numberOfRanks = 0;
   auto domain = makeDomain(rank, numberOfRanks);
   ASSERT_EQ(numberOfRanks, 4);
 
-  dap::performance::PerformanceCounters performanceCounters;
-  dap::ParticleMigration<Particle> migration(MPI_COMM_WORLD, &performanceCounters);
+  autopasdm::performance::PerformanceCounters performanceCounters;
+  autopasdm::ParticleMigration<Particle> migration(MPI_COMM_WORLD, &performanceCounters);
 
   const auto immigrants = migration.migrate({}, domain);
   const auto snapshot = performanceCounters.snapshot();
@@ -171,14 +171,15 @@ TEST(ParticleMigrationTest, RejectsMovementAcrossMoreThanOneSubdomain) {
 struct ThreeDimensionalTestContext {
   int rank{0};
   int numberOfRanks{0};
-  dap::DomainDecomposition domain;
-  dap::ParticleMigration<Particle> migration;
+  autopasdm::DomainDecomposition domain;
+  autopasdm::ParticleMigration<Particle> migration;
 
   ThreeDimensionalTestContext()
       : domain([&]() {
           MPI_Comm_rank(MPI_COMM_WORLD, &rank);
           MPI_Comm_size(MPI_COMM_WORLD, &numberOfRanks);
-          return dap::DomainDecomposition(rank, numberOfRanks, {0., 0., 0.}, {2., 2., 2.}, std::array<int, 3>{2, 2, 2});
+          return autopasdm::DomainDecomposition(rank, numberOfRanks, {0., 0., 0.}, {2., 2., 2.},
+                                                std::array<int, 3>{2, 2, 2});
         }()),
         migration(MPI_COMM_WORLD) {}
 };
@@ -270,11 +271,11 @@ TEST(ParticleMigrationTest, DropsParticlesAtNoneBoundary) {
   MPI_Comm_size(MPI_COMM_WORLD, &numberOfRanks);
   ASSERT_EQ(numberOfRanks, 4);
 
-  constexpr std::array<dap::BoundaryType, 3> boundaries{dap::BoundaryType::none, dap::BoundaryType::none,
-                                                        dap::BoundaryType::none};
-  const dap::DomainDecomposition domain(rank, numberOfRanks, {0., 0., 0.}, {4., 1., 1.}, std::array<int, 3>{4, 1, 1},
-                                        boundaries);
-  const dap::ParticleMigration<Particle> migration(MPI_COMM_WORLD);
+  constexpr std::array<autopasdm::BoundaryType, 3> boundaries{
+      autopasdm::BoundaryType::none, autopasdm::BoundaryType::none, autopasdm::BoundaryType::none};
+  const autopasdm::DomainDecomposition domain(rank, numberOfRanks, {0., 0., 0.}, {4., 1., 1.},
+                                              std::array<int, 3>{4, 1, 1}, boundaries);
+  const autopasdm::ParticleMigration<Particle> migration(MPI_COMM_WORLD);
 
   std::vector<Particle> emigrants;
   if (rank == 0) {
@@ -292,11 +293,11 @@ TEST(ParticleMigrationTest, WrapsPeriodicYBoundaryInThreeDimensions) {
   MPI_Comm_size(MPI_COMM_WORLD, &numberOfRanks);
   ASSERT_EQ(numberOfRanks, 8);
 
-  constexpr std::array<dap::BoundaryType, 3> boundaries{dap::BoundaryType::periodic, dap::BoundaryType::periodic,
-                                                        dap::BoundaryType::none};
-  const dap::DomainDecomposition domain(rank, numberOfRanks, {0., 0., 0.}, {2., 2., 2.}, std::array<int, 3>{2, 2, 2},
-                                        boundaries);
-  const dap::ParticleMigration<Particle> migration(MPI_COMM_WORLD);
+  constexpr std::array<autopasdm::BoundaryType, 3> boundaries{
+      autopasdm::BoundaryType::periodic, autopasdm::BoundaryType::periodic, autopasdm::BoundaryType::none};
+  const autopasdm::DomainDecomposition domain(rank, numberOfRanks, {0., 0., 0.}, {2., 2., 2.},
+                                              std::array<int, 3>{2, 2, 2}, boundaries);
+  const autopasdm::ParticleMigration<Particle> migration(MPI_COMM_WORLD);
 
   std::vector<Particle> emigrants;
   if (rank == 0) {
@@ -321,11 +322,11 @@ TEST(ParticleMigrationTest, RejectsParticleCrossingReflectiveBoundary) {
   MPI_Comm_size(MPI_COMM_WORLD, &numberOfRanks);
   ASSERT_EQ(numberOfRanks, 4);
 
-  constexpr std::array<dap::BoundaryType, 3> boundaries{dap::BoundaryType::reflective, dap::BoundaryType::none,
-                                                        dap::BoundaryType::none};
-  const dap::DomainDecomposition domain(rank, numberOfRanks, {0., 0., 0.}, {4., 1., 1.}, std::array<int, 3>{4, 1, 1},
-                                        boundaries);
-  const dap::ParticleMigration<Particle> migration(MPI_COMM_WORLD);
+  constexpr std::array<autopasdm::BoundaryType, 3> boundaries{
+      autopasdm::BoundaryType::reflective, autopasdm::BoundaryType::none, autopasdm::BoundaryType::none};
+  const autopasdm::DomainDecomposition domain(rank, numberOfRanks, {0., 0., 0.}, {4., 1., 1.},
+                                              std::array<int, 3>{4, 1, 1}, boundaries);
+  const autopasdm::ParticleMigration<Particle> migration(MPI_COMM_WORLD);
 
   std::vector<Particle> emigrants;
   if (rank == 0) {
@@ -355,11 +356,11 @@ TEST(ParticleMigrationTest, RejectsReflectiveCrossingWithoutSubdivisionInThatDim
   MPI_Comm_size(MPI_COMM_WORLD, &numberOfRanks);
   ASSERT_EQ(numberOfRanks, 4);
 
-  constexpr std::array<dap::BoundaryType, 3> boundaries{dap::BoundaryType::reflective, dap::BoundaryType::none,
-                                                        dap::BoundaryType::none};
-  const dap::DomainDecomposition domain(rank, numberOfRanks, {0., 0., 0.}, {1., 4., 1.}, std::array<int, 3>{1, 4, 1},
-                                        boundaries);
-  const dap::ParticleMigration<Particle> migration(MPI_COMM_WORLD);
+  constexpr std::array<autopasdm::BoundaryType, 3> boundaries{
+      autopasdm::BoundaryType::reflective, autopasdm::BoundaryType::none, autopasdm::BoundaryType::none};
+  const autopasdm::DomainDecomposition domain(rank, numberOfRanks, {0., 0., 0.}, {1., 4., 1.},
+                                              std::array<int, 3>{1, 4, 1}, boundaries);
+  const autopasdm::ParticleMigration<Particle> migration(MPI_COMM_WORLD);
 
   std::vector<Particle> emigrants;
   if (rank == 0) {
