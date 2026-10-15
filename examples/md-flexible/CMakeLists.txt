@@ -28,7 +28,6 @@ target_link_libraries(
     PUBLIC
         autopas
         autopasdm
-        generators
         molecularDynamicsLibrary
         yaml-cpp
         ${ALL_LIB}

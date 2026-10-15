@@ -71,6 +71,19 @@ and a small md-flexible-particle integration example at:
 build/examples/md-flexible/autopasdm-lj-example
 ```
 
+### Quick MPI test
+
+After building with MPI support, a small md-flexible example can be started directly
+from the AutoPasDM repository root with four MPI ranks:
+
+```bash
+mpirun -np 4 ./build/examples/md-flexible/md-flexible \
+  --yaml-filename ./examples/md-flexible/input/autopasdm_performance_baseline.yaml
+```
+
+This runs a short periodic Lennard-Jones simulation and is a convenient check that
+the AutoPasDM md-flexible integration starts correctly with multiple ranks.
+
 ## Current feature set
 
 - Cartesian domain decomposition in one, two, or three dimensions.

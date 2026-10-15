@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -24,7 +25,7 @@ class PairCountingFunctor : public autopas::PairwiseFunctor<Particle, PairCounti
  public:
   using SoAArraysType = typename Particle::SoAArraysType;
   using SoAView = autopas::SoAView<SoAArraysType>;
-  using NeighborList = std::vector<size_t, autopas::AlignedAllocator<size_t>>;
+  using NeighborList = std::span<const std::size_t>;
 
   /**
    * Construct a pair counter for one local ownership box.
@@ -112,7 +113,7 @@ class PairCountingFunctor : public autopas::PairwiseFunctor<Particle, PairCounti
    * @param neighborList Neighbor indices supplied by AutoPas.
    * @param newton3 Whether the traversal uses Newton's third law.
    */
-  void SoAFunctorVerlet(SoAView /*soa*/, size_t /*indexFirst*/, const NeighborList & /*neighborList*/,
+  void SoAFunctorVerlet(SoAView /*soa*/, size_t /*indexFirst*/, NeighborList /*neighborList*/,
                         bool /*newton3*/) override {
     throw std::runtime_error("PairCountingFunctor only supports AoS.");
   }

@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -24,7 +25,7 @@ class TestForceFunctor : public autopas::PairwiseFunctor<Particle, TestForceFunc
  public:
   using SoAArraysType = typename Particle::SoAArraysType;
   using SoAView = autopas::SoAView<SoAArraysType>;
-  using NeighborList = std::vector<std::size_t, autopas::AlignedAllocator<std::size_t>>;
+  using NeighborList = std::span<const std::size_t>;
 
   explicit TestForceFunctor(double cutoff)
       : autopas::PairwiseFunctor<Particle, TestForceFunctor<Particle>>(cutoff), _cutoffSquared(cutoff * cutoff) {}
@@ -67,7 +68,7 @@ class TestForceFunctor : public autopas::PairwiseFunctor<Particle, TestForceFunc
     throw std::runtime_error("TestForceFunctor only supports AoS.");
   }
 
-  void SoAFunctorVerlet(SoAView /*soa*/, std::size_t /*indexFirst*/, const NeighborList & /*neighborList*/,
+  void SoAFunctorVerlet(SoAView /*soa*/, std::size_t /*indexFirst*/, NeighborList /*neighborList*/,
                         bool /*newton3*/) override {
     throw std::runtime_error("TestForceFunctor only supports AoS.");
   }

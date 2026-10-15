@@ -85,6 +85,15 @@ if(NOT TARGET autopas)
     set(AUTOPAS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(AUTOPAS_ENABLE_ENERGY_MEASUREMENTS OFF CACHE BOOL "" FORCE)
 
+    # Since recent AutoPas versions, the molecular-dynamics application library
+    # is opt-in when AutoPas is embedded as a subproject. The bundled AutoPasDM
+    # examples use MoleculeLJ/LJFunctor and therefore need this target. Linking
+    # molecularDynamicsLibrary also propagates its current include directory
+    # (applicationLibrary/molecularDynamics).
+    if(AUTOPASDM_BUILD_EXAMPLES)
+        set(AUTOPAS_BUILD_MD_LIBRARY ON CACHE BOOL "" FORCE)
+    endif()
+
     add_subdirectory(
         "${AUTOPAS_SOURCE_DIR}"
         "${CMAKE_BINARY_DIR}/autopas"
