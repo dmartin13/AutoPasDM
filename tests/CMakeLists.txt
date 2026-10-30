@@ -4,6 +4,7 @@ add_executable(
     PerformanceCountersTest.cpp
     InvertedPressureTest.cpp
     ReflectiveBoundaryTest.cpp
+    StormerVerletTest.cpp
 )
 
 target_link_libraries(
