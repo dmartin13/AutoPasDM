@@ -8,9 +8,12 @@
 #include "autopas/options/TraversalOption.h"
 #include "autopasdm/AutoPasDM.h"
 #include "autopasdm/Runtime.h"
+#include "autopasdm/integration/AutoPasForceEvaluator.h"
+#include "autopasdm/integration/StormerVerlet.h"
 #include "molecularDynamicsLibrary/LJFunctor.h"
 #include "src/TypeDefinitions.h"
 #include "src/distributed/MoleculeLJParticleSerializer.h"
+#include "src/integration/MDFlexibleParticleOperations.h"
 
 #if MD_FLEXIBLE_MODE == MULTISITE
 #error "The AutoPasDM LJ example currently supports SINGLESITE only."
@@ -55,7 +58,25 @@ int main(int argc, char **argv) {
 
   using LJFunctor = mdLib::LJFunctor<ParticleType, true, true, autopas::FunctorN3Modes::Both, false, false>;
   LJFunctor functor(cutoff, particlePropertiesLibrary);
-  particles.computeInteractions(&functor);
+
+  MDFlexibleParticleOperations particleOperations{
+      particlePropertiesLibrary,
+      {0.0, 0.0, 0.0},
+  };
+
+  autopasdm::integration::AutoPasForceEvaluator forceEvaluator{functor};
+  autopasdm::integration::StormerVerlet integrator;
+
+  static_assert(autopasdm::integration::TimeIntegrator<decltype(integrator), decltype(particles),
+                                                       decltype(particleOperations), decltype(forceEvaluator)>);
+
+  constexpr double deltaT = 1e-4;
+
+  (void)integrator.initialize(particles, particleOperations, forceEvaluator);
+
+  for (int step = 0; step < 10; ++step) {
+    (void)integrator.step(particles, deltaT, particleOperations, forceEvaluator);
+  }
 
   particles.barrier();
   for (int outputRank = 0; outputRank < particles.numberOfRanks(); ++outputRank) {
