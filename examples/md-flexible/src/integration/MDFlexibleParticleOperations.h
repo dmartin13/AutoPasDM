@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <cstddef>
 
 #include "src/TypeDefinitions.h"
 
@@ -11,33 +10,37 @@ struct MDFlexibleParticleOperations {
 
   template <class Particle>
   void resetForce(Particle &particle) const {
+    // Set the force to the configured external force before pair forces are added.
     particle.setF(globalForce);
   }
 
   template <class Particle>
-  void updatePosition(Particle &particle, double dt) const {
-    const auto mass = particlePropertiesLibrary.getMolMass(particle.getTypeId());
-    const auto force = particle.getF();
-
-    particle.setOldF(force);
-    particle.setF(globalForce);
-
-    auto displacement = particle.getV();
-    for (std::size_t d = 0; d < 3; ++d) {
-      displacement[d] = dt * displacement[d] + (dt * dt / (2. * mass)) * force[d];
-    }
-    particle.addR(displacement);
+  double getMass(const Particle &particle) const {
+    return particlePropertiesLibrary.getMolMass(particle.getTypeId());
   }
 
   template <class Particle>
-  void updateVelocity(Particle &particle, double dt) const {
-    const auto mass = particlePropertiesLibrary.getMolMass(particle.getTypeId());
-    const auto oldForce = particle.getOldF();
+  auto getPosition(const Particle &particle) const {
+    return particle.getR();
+  }
 
-    auto deltaVelocity = particle.getF();
-    for (std::size_t d = 0; d < 3; ++d) {
-      deltaVelocity[d] = (dt / (2. * mass)) * (deltaVelocity[d] + oldForce[d]);
-    }
-    particle.addV(deltaVelocity);
+  template <class Particle, class Vector>
+  void setPosition(Particle &particle, const Vector &position) const {
+    particle.setR(position);
+  }
+
+  template <class Particle>
+  auto getVelocity(const Particle &particle) const {
+    return particle.getV();
+  }
+
+  template <class Particle, class Vector>
+  void setVelocity(Particle &particle, const Vector &velocity) const {
+    particle.setV(velocity);
+  }
+
+  template <class Particle>
+  auto getForce(const Particle &particle) const {
+    return particle.getF();
   }
 };
