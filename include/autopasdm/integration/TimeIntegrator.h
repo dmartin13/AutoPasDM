@@ -3,7 +3,7 @@
 #include <concepts>
 #include <functional>
 
-namespace autopasdm::integration {
+namespace autopasdm::timeintegration {
 
 template <class ForceEvaluator, class ParticleSystem>
 concept ForceEvaluatorFor = requires(ForceEvaluator &forceEvaluator, ParticleSystem &particles) {
@@ -11,11 +11,11 @@ concept ForceEvaluatorFor = requires(ForceEvaluator &forceEvaluator, ParticleSys
 };
 
 template <class Integrator, class ParticleSystem, class ParticleOperations, class ForceEvaluator>
-concept TimeIntegrator = ForceEvaluatorFor<ForceEvaluator, ParticleSystem> &&
+concept TimeIntegrator = ForceEvaluatorFor<ForceEvaluator, ParticleSystem> and
     requires(Integrator &integrator, ParticleSystem &particles, ParticleOperations &operations,
              ForceEvaluator &forceEvaluator, double dt) {
   integrator.initialize(particles, operations, forceEvaluator);
   integrator.step(particles, dt, operations, forceEvaluator);
 };
 
-}  // namespace autopasdm::integration
+}  // namespace autopasdm::timeintegration

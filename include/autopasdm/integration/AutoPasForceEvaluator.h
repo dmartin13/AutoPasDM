@@ -1,6 +1,6 @@
 #pragma once
 
-namespace autopasdm::integration {
+namespace autopasdm::timeintegration {
 
 /**
  * Evaluates interactions with one AutoPas functor.
@@ -22,4 +22,4 @@ class AutoPasForceEvaluator {
   Functor &_functor;
 };
 
-}  // namespace autopasdm::integration
+}  // namespace autopasdm::timeintegration

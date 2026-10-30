@@ -5,7 +5,7 @@
 
 #include "autopasdm/integration/TimeIntegrator.h"
 
-namespace autopasdm::integration {
+namespace autopasdm::timeintegration {
 
 struct StormerVerlet {
   template <class ParticleSystem, class ParticleOperations, class ForceEvaluator>
@@ -38,4 +38,4 @@ struct StormerVerlet {
   }
 };
 
-}  // namespace autopasdm::integration
+}  // namespace autopasdm::timeintegration

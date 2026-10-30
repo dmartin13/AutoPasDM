@@ -98,15 +98,15 @@ int main(int argc, char **argv) {
   };
 
   // Wrap the LJ functor in a force evaluator that the integrator can call.
-  autopasdm::integration::AutoPasForceEvaluator forceEvaluator{functor};
+  autopasdm::timeintegration::AutoPasForceEvaluator forceEvaluator{functor};
 
   // Select the Störmer-Verlet integrator for time integration.
-  autopasdm::integration::StormerVerlet integrator;
+  autopasdm::timeintegration::StormerVerlet integrator;
 
   // Check at compile time that the integrator, particle system,
   // particle operations, and force evaluator provide the required interface.
-  static_assert(autopasdm::integration::TimeIntegrator<decltype(integrator), decltype(autopasDM),
-                                                       decltype(particleOperations), decltype(forceEvaluator)>);
+  static_assert(autopasdm::timeintegration::TimeIntegrator<decltype(integrator), decltype(autopasDM),
+                                                           decltype(particleOperations), decltype(forceEvaluator)>);
 
   // Set the time step size.
   constexpr double deltaT = 1e-4;
